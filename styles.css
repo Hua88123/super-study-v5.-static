@@ -53,3 +53,11 @@
 .quote-table th:nth-child(4) {
   min-width: 80px;
 }
+
+.local-note {
+  display: block;
+  margin-top: 6px;
+  color: #e4251a;
+  font-weight: 800;
+  font-size: 13px;
+}
