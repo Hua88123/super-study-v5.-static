@@ -1,0 +1,11 @@
+{
+  "name": "super-study-static-system",
+  "version": "5.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo static build",
+    "start": "echo static system"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

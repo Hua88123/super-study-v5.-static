@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>超能游学报价系统 V5 静态稳定版</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <img id="sideLogo" src="./public/superstudy-logo.png" alt="超能游学 Logo" />
+        <div><strong>超能游学</strong><span>SUPER STUDY V5</span></div>
+      </div>
+      <button class="nav active" data-tab="quote">自动报价</button>
+      <button class="nav" data-tab="records">报价记录</button>
+      <button class="nav" data-tab="schools">学校数据库</button>
+      <button class="nav" data-tab="fees">本地费用</button>
+      <button class="nav" data-tab="settings">系统设置</button>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div><h1>超能游学报价系统</h1><p>V5 静态稳定版 · 无需 npm 安装 · Vercel 不再卡依赖</p></div>
+        <div class="top-actions"><button class="secondary" id="backupBtn">导出数据</button><label class="secondary file-label">导入数据<input type="file" id="importData" accept="application/json" /></label><button class="danger" id="resetBtn">恢复默认</button></div>
+      </header>
+      <section class="tab show" id="tab-quote">
+        <div class="grid two">
+          <div class="card"><h2>自动报价</h2><div class="form-grid">
+            <label>学校<select id="schoolSelect"></select></label><label>课程<select id="courseSelect"></select></label><label>房型<select id="roomSelect"></select></label><label>周数<select id="weeksSelect"></select></label><label>入学日期（统一周日）<select id="startDateSelect"></select></label><label>学生备注（可不填）<input id="studentNote" placeholder="例如：学生A / 8周报价" /></label>
+          </div><div class="checks"><label><input type="checkbox" id="lowSeason" checked /> 淡季优惠</label><label><input type="checkbox" id="schoolRate" /> 学校淡季折扣</label><label><input type="checkbox" id="peakSeason" /> 旺季附加</label><label><input type="checkbox" id="longDiscount" checked /> 长期优惠</label><label><input type="checkbox" id="agencyDiscount" checked /> 超能折扣</label><label><input type="checkbox" id="waiveRegistration" /> 超能减免注册金</label></div><div class="btn-row"><button id="copyWechat">复制微信报价</button><button id="saveRecord">保存报价记录</button><button id="downloadImage">下载报价单图片</button><button id="printPdf">导出一页 PDF</button></div></div>
+          <div class="card calc-card"><h2>自动计算</h2><div id="calcBox"></div></div>
+        </div><div class="quote-wrap"><div id="quoteSheet" class="quote-sheet"></div></div>
+      </section>
+      <section class="tab" id="tab-records"><div class="card"><h2>报价记录</h2><div id="recordsList"></div></div></section>
+      <section class="tab" id="tab-schools"><div class="grid two"><div class="card"><h2>学校列表</h2><div class="btn-row"><button id="addSchool">新增学校</button></div><div id="schoolList"></div></div><div class="card"><h2>学校设置</h2><div id="schoolEditor"></div></div></div></section>
+      <section class="tab" id="tab-fees"><div class="card"><h2>菲律宾本地费用（到校以比索支付）</h2><p class="muted">每个学校可以单独设置。本地费用只做参考，最终以学校实际收取为准。</p><div id="feeEditor"></div></div></section>
+      <section class="tab" id="tab-settings"><div class="card"><h2>系统设置</h2><div id="settingsEditor"></div></div></section>
+    </main>
+  </div>
+  <script src="./script.js"></script>
+</body>
+</html>
