@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>超能游学报价系统 V5 静态稳定版</title>
+  <title>超能游学报价系统 V5 学校独立优惠自动切换版</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -14,15 +14,20 @@
         <div><strong>超能游学</strong><span>SUPER STUDY V5</span></div>
       </div>
       <button class="nav active" data-tab="quote">自动报价</button>
-      <button class="nav" data-tab="records">报价记录</button>
-      <button class="nav" data-tab="schools">学校数据库</button>
-      <button class="nav" data-tab="fees">本地费用</button>
-      <button class="nav" data-tab="settings">系统设置</button>
+      <button class="nav admin-only" data-tab="records">报价记录</button>
+      <button class="nav admin-only" data-tab="schools">学校数据库</button>
+      <button class="nav admin-only" data-tab="fees">本地费用</button>
+      <button class="nav admin-only" data-tab="settings">系统设置</button>
+          <div class="role-box">
+        <div class="role-hint" id="roleHint">员工模式：仅可自助报价</div>
+        <button class="secondary employee-only" id="adminLoginBtn">管理员登录</button>
+        <button class="secondary admin-only" id="adminLogoutBtn">退出管理员</button>
+      </div>
     </aside>
     <main class="main">
       <header class="top">
-        <div><h1>超能游学报价系统</h1><p>V5 静态稳定版 · 无需 npm 安装 · Vercel 不再卡依赖</p></div>
-        <div class="top-actions"><button class="secondary" id="backupBtn">导出数据</button><label class="secondary file-label">导入数据<input type="file" id="importData" accept="application/json" /></label><button class="danger" id="resetBtn">恢复默认</button></div>
+        <div><h1>超能游学报价系统</h1><p>V5 · 学校独立优惠自动切换 · 价格单文本/CSV导入</p></div>
+        <div class="top-actions admin-only"><button class="secondary" id="backupBtn">导出数据</button><label class="secondary file-label">导入数据<input type="file" id="importData" accept="application/json" /></label><button class="danger" id="resetBtn">恢复默认</button></div>
       </header>
       <section class="tab show" id="tab-quote">
         <div class="grid two">
