@@ -48,6 +48,7 @@ function sbRequest(method, path, body) {
         "Authorization": `Bearer ${SUPABASE_KEY}`,
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
         ...(payload ? {"Content-Length": Buffer.byteLength(payload)} : {})
       }
     };

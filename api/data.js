@@ -48,6 +48,7 @@ function sbRequest(method, path, body) {
         "Authorization": `Bearer ${SUPABASE_KEY}`,
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
         ...(payload ? {"Content-Length": Buffer.byteLength(payload)} : {})
       }
     };
@@ -128,7 +129,7 @@ module.exports = async function handler(req, res) {
       const body = raw ? JSON.parse(raw) : {};
       if(!body.payload) return json(res,400,{error:"缺少 payload"});
       const payload={id:DATA_ROW,payload:body.payload,updated_at:new Date().toISOString()};
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}`;
+      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?on_conflict=id`;
       const r = await sbRequest("POST", path, payload);
       if(!r.ok) return json(res,r.status,{error:r.text});
       return json(res,200,{ok:true});
