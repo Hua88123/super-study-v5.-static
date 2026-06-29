@@ -3,30 +3,45 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>超能游学报价系统 V7 长期稳定云端版</title>
+  <title>超能游学报价系统 V8 员工授权单设备登录版</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+      <img src="./public/superstudy-logo.png" alt="超能游学" />
+      <h1>超能游学报价系统</h1>
+      <p>员工授权登录 · 一人一码 · 单设备绑定</p>
+      <label>员工授权码<input id="employeeCodeInput" placeholder="请输入管理员发给你的授权码" autocomplete="off" /></label>
+      <button id="employeeLoginBtn">员工登录</button>
+      <button class="secondary" id="employeeAdminLoginBtn">管理员登录</button>
+      <div class="login-tip">员工首次登录会自动绑定当前设备，授权码转发给别人也不能在第三台设备使用。</div>
+    </div>
+  </div>
+
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
         <img id="sideLogo" src="./public/superstudy-logo.png" alt="超能游学 Logo" />
-        <div><strong>超能游学</strong><span>SUPER STUDY V7</span></div>
+        <div><strong>超能游学</strong><span>SUPER STUDY V8</span></div>
       </div>
       <button class="nav active" data-tab="quote">自动报价</button>
       <button class="nav admin-only" data-tab="records">报价记录</button>
       <button class="nav admin-only" data-tab="schools">学校数据库</button>
       <button class="nav admin-only" data-tab="fees">本地费用</button>
       <button class="nav admin-only" data-tab="settings">系统设置</button>
+      <button class="nav admin-only" data-tab="employees">员工授权</button>
           <div class="role-box">
         <div class="role-hint" id="roleHint">员工模式：仅可自助报价</div>
         <button class="secondary employee-only" id="adminLoginBtn">管理员登录</button>
         <button class="secondary admin-only" id="adminLogoutBtn">退出管理员</button>
+        <button class="secondary employee-only" id="employeeLogoutBtn">退出员工登录</button>
       </div>
     </aside>
     <main class="main">
       <header class="top">
-        <div><h1>超能游学报价系统</h1><p>V7 · 长期稳定云端同步 · 员工打开网址自动同步</p></div>
+        <div><h1>超能游学报价系统</h1><p>V8 · 员工授权登录 · 单设备绑定 · 云端同步</p></div>
         <div class="top-actions admin-only"><button class="secondary" id="backupBtn">导出数据</button><label class="secondary file-label">导入数据<input type="file" id="importData" accept="application/json" /></label><button class="danger" id="resetBtn">恢复默认</button></div>
       </header>
       <section class="tab show" id="tab-quote">
@@ -41,6 +56,7 @@
       <section class="tab" id="tab-schools"><div class="grid two"><div class="card"><h2>学校列表</h2><div class="btn-row"><button id="addSchool">新增学校</button></div><div id="schoolList"></div></div><div class="card"><h2>学校设置</h2><div id="schoolEditor"></div></div></div></section>
       <section class="tab" id="tab-fees"><div class="card"><h2>菲律宾本地费用（到校以比索支付）</h2><p class="muted">每个学校可以单独设置。本地费用只做参考，最终以学校实际收取为准。</p><div id="feeEditor"></div></div></section>
       <section class="tab" id="tab-settings"><div class="card"><h2>系统设置</h2><div id="settingsEditor"></div></div></section>
+      <section class="tab" id="tab-employees"><div class="card"><h2>员工授权管理</h2><p class="muted">员工一人一个授权码。首次登录自动绑定设备，授权码发给第三人也无法登录。</p><div id="employeeManager"></div></div></section>
     </main>
   </div>
   <script src="./script.js"></script>

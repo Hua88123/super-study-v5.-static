@@ -81,61 +81,47 @@ async function employeeValid(req){
 }
 function maskKey(key){return !key?"":(key.slice(0,8)+"..."+key.slice(-6))}
 
-module.exports = async function handler(req, res) {
-  try {
-    const debug = req.url && req.url.includes("debug=1");
-    if (debug) {
-      let result = {
-        ok: false,
-        env: {
-          SUPABASE_URL_present: !!SUPABASE_URL,
-          SUPABASE_URL_value: SUPABASE_URL || null,
-          SUPABASE_KEY_present: !!SUPABASE_KEY,
-          SUPABASE_KEY_masked: maskKey(SUPABASE_KEY),
-          SUPABASE_TABLE: DATA_TABLE,
-          SUPABASE_ROW: DATA_ROW,
-          node: process.version
-        }
-      };
-      try {
-        const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
-        const r = await sbRequest("GET", path);
-        result.ok = r.ok;
-        result.supabase_status = r.status;
-        result.supabase_response_preview = r.text.slice(0,500);
-      } catch(err) {
-        result.error = err.message || String(err);
-        result.code = err.code || null;
+module.exports = async function handler(req,res){
+  try{
+    if(req.method!=="POST") return json(res,405,{error:"Method not allowed"});
+    const raw=await readBody(req);
+    const body=raw?JSON.parse(raw):{};
+    const action=body.action;
+
+    if(action==="login"){
+      const code=String(body.code||"").trim();
+      const deviceId=String(body.deviceId||"").trim();
+      const deviceName=String(body.deviceName||"").trim().slice(0,200);
+      if(!code||!deviceId) return json(res,400,{error:"缺少授权码或设备ID"});
+      const path=`/rest/v1/${encodeURIComponent(EMP_TABLE)}?login_code=eq.${encodeURIComponent(code)}&select=*`;
+      const r=await sbRequest("GET",path);
+      if(!r.ok) return json(res,r.status,{error:r.text});
+      const emp=(JSON.parse(r.text||"[]"))[0];
+      if(!emp) return json(res,401,{error:"授权码不存在"});
+      if(!emp.is_active) return json(res,403,{error:"该员工授权已停用"});
+      if(emp.bound_device_id && emp.bound_device_id!==deviceId){
+        return json(res,403,{error:"该授权码已绑定其他设备，不能在第三方设备登录。请联系管理员重置设备。"});
       }
-      return json(res,200,result);
+      if(!emp.bound_device_id){
+        const upd={bound_device_id:deviceId,bound_device_name:deviceName,last_login_at:new Date().toISOString()};
+        const up=await sbRequest("PATCH",`/rest/v1/${encodeURIComponent(EMP_TABLE)}?id=eq.${encodeURIComponent(emp.id)}`,upd);
+        if(!up.ok) return json(res,up.status,{error:up.text});
+      }else{
+        await sbRequest("PATCH",`/rest/v1/${encodeURIComponent(EMP_TABLE)}?id=eq.${encodeURIComponent(emp.id)}`,{last_login_at:new Date().toISOString()}).catch(()=>{});
+      }
+      return json(res,200,{employee:{id:emp.id,name:emp.name}});
     }
 
-    const admin = isAdmin(req);
-    const empOk = await employeeValid(req).catch(()=>false);
-
-    if (req.method === "GET") {
-      if(!admin && !empOk) return json(res, 401, {error:"未授权，请先登录员工或管理员"});
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
-      const r = await sbRequest("GET", path);
-      if(!r.ok) return json(res,r.status,{error:r.text});
-      const rows=JSON.parse(r.text||"[]");
-      return json(res,200,rows[0]||{});
+    if(action==="check"){
+      const employeeId=String(body.employeeId||"").trim();
+      const deviceId=String(body.deviceId||"").trim();
+      const emp=employeeId?await getEmployee(employeeId):null;
+      const valid=!!(emp&&emp.is_active&&emp.bound_device_id===deviceId);
+      return json(res,200,{valid,employee:valid?{id:emp.id,name:emp.name}:null});
     }
 
-    if (req.method === "POST") {
-      if(!admin) return json(res, 403, {error:"只有管理员可以上传修改数据"});
-      const raw = await readBody(req);
-      const body = raw ? JSON.parse(raw) : {};
-      if(!body.payload) return json(res,400,{error:"缺少 payload"});
-      const payload={id:DATA_ROW,payload:body.payload,updated_at:new Date().toISOString()};
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}`;
-      const r = await sbRequest("POST", path, payload);
-      if(!r.ok) return json(res,r.status,{error:r.text});
-      return json(res,200,{ok:true});
-    }
-
-    return json(res,405,{error:"Method not allowed"});
-  } catch(err) {
+    return json(res,400,{error:"未知操作"});
+  }catch(err){
     return json(res,500,{error:err.message||String(err),code:err.code||null});
   }
 };

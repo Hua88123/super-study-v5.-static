@@ -28,7 +28,7 @@ function scheduleCloudSave(){
 async function uploadCloudData(silent=false){
   try{
     updateCloudStatus("正在上传到云端...");
-    let res=await fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payload:data})});
+    let res=await fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders()},body:JSON.stringify({payload:data})});
     let body=await res.json().catch(()=>({}));
     if(!res.ok||body.error)throw new Error(body.error||("HTTP "+res.status));
     updateCloudStatus("云端已同步："+new Date().toLocaleString());
@@ -43,7 +43,7 @@ async function uploadCloudData(silent=false){
 async function loadCloudData(silent=false){
   try{
     updateCloudStatus("正在读取云端数据...");
-    let res=await fetch("/api/data",{cache:"no-store"});
+    let res=await fetch("/api/data",{cache:"no-store",headers:authHeaders()});
     let body=await res.json().catch(()=>({}));
     if(!res.ok||body.error)throw new Error(body.error||("HTTP "+res.status));
     if(body.payload){
@@ -85,8 +85,8 @@ function saveCloudSettings(){
   alert("V7 云端同步已开启，不需要在软件里填写 Supabase 信息");
 }
 async function autoLoadCloudData(){
-  await loadCloudData(true);
-  setInterval(()=>{if(!isAdminMode())loadCloudData(true)},5*60*1000);
+  if(isAdminMode()||isEmployeeLoggedIn()) await loadCloudData(true);
+  setInterval(()=>{if(isAdminMode()||isEmployeeLoggedIn())loadCloudData(true)},5*60*1000);
 }
 function saveData(){saveLocalOnly();scheduleCloudSave()}function normalize(d){let b=clone(defaultData);d.settings={...b.settings,...(d.settings||{})};d.schools=(d.schools&&d.schools.length?d.schools:b.schools).map(s=>({...b.schools[0],...s,discounts:{...b.schools[0].discounts,...(s.discounts||{})},courses:s.courses||[],rooms:s.rooms||[],localFees:(s.localFees&&s.localFees.length?s.localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek}))),officialTotals:s.officialTotals||{},bookFees:{4:2500,8:4000,12:5500,...(s.bookFees||{})},visaFees:{9:7500,12:10000,16:13000,20:16000,...(s.visaFees||{})}}));d.records=d.records||[];return d}function currentSchool(){return data.schools.find(s=>s.id===selectedSchoolId)||data.schools[0]}function editingSchool(){return data.schools.find(s=>s.id===editingSchoolId)||data.schools[0]}function num(v){let n=Number(v);return Number.isFinite(n)?n:0}function money(n){return `${Math.round(num(n)).toLocaleString()} 美元`}function peso(n){return `${Math.round(num(n)).toLocaleString()} PHP`}function rmb(n){return `约 ${Math.round(num(n)).toLocaleString()} 元`}function html(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function formatDateLocal(date){let y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,"0"),d=String(date.getDate()).padStart(2,"0");return `${y}-${m}-${d}`}function nextSunday(){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+((7-d.getDay())%7));return d}function sundayOptions(count=140){let st=nextSunday(),arr=[];for(let i=0;i<count;i++){let d=new Date(st);d.setDate(st.getDate()+i*7);arr.push(formatDateLocal(d))}return arr}function addWeeks(ds,w){let d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+w*7);return formatDateLocal(d)}function longAmount(d,w){if(w>=24)return num(d.long24);if(w>=20)return num(d.long20);if(w>=16)return num(d.long16);if(w>=12)return num(d.long12);return 0}
@@ -289,7 +289,41 @@ function renderSettings(){
 }
 function saveSettings(){let set=data.settings;set.brandName=$("setBrand").value;set.brandEn=$("setBrandEn").value;set.usdRate=num($("setUsd").value);set.pesoRate=num($("setPeso").value);set.watermarkText=$("setWatermark").value;set.watermarkEnabled=$("setWatermarkEnabled").value==="true";set.agencyAdvantageTitle=$("setAdvTitle").value;set.agencyAdvantageLine1=$("setAdv1").value;set.agencyAdvantageLine2=$("setAdv2").value;set.adminPassword=$("setAdminPassword").value||"SuperStudy888";saveData();refreshAll();alert("已保存")}
 
-const ADMIN_SESSION_KEY = "super-study-admin-session-v5";
+const ADMIN_SESSION_KEY = "super-study-admin-session-v8";
+const ADMIN_PASS_KEY = "super-study-admin-pass-v8";
+const EMPLOYEE_SESSION_KEY = "super-study-employee-session-v8";
+const DEVICE_ID_KEY = "super-study-device-id-v8";
+
+function getDeviceId(){
+  let id=localStorage.getItem(DEVICE_ID_KEY);
+  if(!id){
+    id=(crypto&&crypto.randomUUID)?crypto.randomUUID():("dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));
+    localStorage.setItem(DEVICE_ID_KEY,id);
+  }
+  return id;
+}
+function getEmployeeSession(){
+  try{return JSON.parse(localStorage.getItem(EMPLOYEE_SESSION_KEY)||"null")}catch(e){return null}
+}
+function isEmployeeLoggedIn(){
+  return !!getEmployeeSession();
+}
+function getAdminPasswordForApi(){
+  return sessionStorage.getItem(ADMIN_PASS_KEY)||"";
+}
+function authHeaders(){
+  const h={};
+  if(isAdminMode()){
+    h["x-admin-password"]=getAdminPasswordForApi();
+  }else{
+    const emp=getEmployeeSession();
+    if(emp&&emp.id){
+      h["x-employee-id"]=emp.id;
+      h["x-device-id"]=getDeviceId();
+    }
+  }
+  return h;
+}
 
 function isAdminMode(){
   return sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
@@ -297,6 +331,9 @@ function isAdminMode(){
 
 function activateTab(tab){
   if(!isAdminMode() && tab !== "quote"){
+    tab = "quote";
+  }
+  if(!isAdminMode() && !isEmployeeLoggedIn()){
     tab = "quote";
   }
   document.querySelectorAll(".nav").forEach(b=>b.classList.remove("active"));
@@ -309,12 +346,17 @@ function activateTab(tab){
 
 function applyRoleMode(){
   const admin = isAdminMode();
+  const emp = getEmployeeSession();
+  const logged = admin || !!emp;
   document.body.classList.toggle("admin-mode", admin);
   document.body.classList.toggle("employee-mode", !admin);
+  document.body.classList.toggle("locked-mode", !logged);
   const roleHint = $("roleHint");
   if(roleHint){
-    roleHint.textContent = admin ? "管理员模式：可查看全部功能" : "员工模式：仅可自助报价";
+    roleHint.textContent = admin ? "管理员模式：可查看全部功能" : (emp ? `员工模式：${emp.name || "已授权"} · 仅可自助报价` : "未登录：请先员工授权登录");
   }
+  const logoutBtn=$("employeeLogoutBtn");
+  if(logoutBtn) logoutBtn.style.display=(!admin && emp)?"block":"none";
   if(!admin){
     activateTab("quote");
   }
@@ -326,8 +368,11 @@ function adminLogin(){
   const realPassword = data.settings.adminPassword || "SuperStudy888";
   if(password === realPassword){
     sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+    sessionStorage.setItem(ADMIN_PASS_KEY, password);
+    localStorage.removeItem(EMPLOYEE_SESSION_KEY);
     applyRoleMode();
     refreshAll();
+    loadCloudData(true);
     alert("已进入管理员模式");
   }else{
     alert("管理员密码错误");
@@ -336,8 +381,96 @@ function adminLogin(){
 
 function adminLogout(){
   sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  sessionStorage.removeItem(ADMIN_PASS_KEY);
   applyRoleMode();
   alert("已退出管理员模式");
 }
 
-function refreshAll(){renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();$("sideLogo").src=data.settings.brandLogo}function init(){applyCloudConfigFromUrl();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","roomSelect","weeksSelect","startDateSelect","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=downloadImage;$("printPdf").onclick=()=>window.print();$("addSchool").onclick=()=>{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveData();refreshAll()};$("backupBtn").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="超能游学报价系统数据备份.json";a.click()};$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{data=normalize(JSON.parse(r.result));saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){localStorage.removeItem(STORAGE_KEY);data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData()}init();
+async function employeeLogin(){
+  const input=$("employeeCodeInput");
+  const code=(input?.value||"").trim();
+  if(!code) return alert("请输入员工授权码");
+  try{
+    const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"login",code,deviceId:getDeviceId(),deviceName:navigator.userAgent.slice(0,120)})});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error) throw new Error(body.error||"登录失败");
+    localStorage.setItem(EMPLOYEE_SESSION_KEY,JSON.stringify(body.employee));
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    sessionStorage.removeItem(ADMIN_PASS_KEY);
+    applyRoleMode();
+    await loadCloudData(true);
+    alert("员工登录成功");
+  }catch(err){
+    alert(err.message||String(err));
+  }
+}
+
+function employeeLogout(){
+  localStorage.removeItem(EMPLOYEE_SESSION_KEY);
+  applyRoleMode();
+  alert("已退出员工登录");
+}
+
+async function verifyEmployeeSession(){
+  const emp=getEmployeeSession();
+  if(!emp || isAdminMode()) return;
+  try{
+    const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"check",employeeId:emp.id,deviceId:getDeviceId()})});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error||!body.valid){
+      localStorage.removeItem(EMPLOYEE_SESSION_KEY);
+      applyRoleMode();
+    }
+  }catch(e){}
+}
+
+
+
+function randomEmployeeCode(){
+  return "SS-" + Math.random().toString(36).slice(2,6).toUpperCase() + "-" + Math.random().toString(36).slice(2,6).toUpperCase();
+}
+async function employeeApi(payload){
+  const res=await fetch("/api/employees",{method:"POST",headers:{"Content-Type":"application/json","x-admin-password":getAdminPasswordForApi()},body:JSON.stringify(payload||{})});
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok||body.error) throw new Error(body.error||"员工接口失败");
+  return body;
+}
+async function loadEmployees(){
+  if(!isAdminMode() || !$("employeeManager")) return;
+  try{
+    const res=await fetch("/api/employees",{headers:{"x-admin-password":getAdminPasswordForApi()}});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error) throw new Error(body.error||"读取失败");
+    renderEmployeeManager(body.employees||[]);
+  }catch(err){
+    $("employeeManager").innerHTML=`<div class="cloud-status bad">员工列表读取失败：${html(err.message||err)}</div>`;
+  }
+}
+function renderEmployeeManager(list=[]){
+  if(!$("employeeManager")) return;
+  $("employeeManager").innerHTML=`<div class="sub-box"><h3>新增授权员工</h3><div class="editor-grid">${field("员工姓名","newEmpName","","text","例如：小王")}${field("授权码","newEmpCode",randomEmployeeCode(),"text","一人一个授权码，发给员工登录")}</div><div class="btn-row"><button onclick="createEmployee()">创建员工授权</button><button class="secondary" onclick="$('newEmpCode').value=randomEmployeeCode()">生成新授权码</button></div><p class="muted">员工首次登录后会绑定当前设备。授权码转发给别人，其他设备也无法登录。</p></div>
+  <h3>员工列表</h3>
+  <table class="employee-table"><thead><tr><th>员工</th><th>授权码</th><th>状态</th><th>设备绑定</th><th>操作</th></tr></thead><tbody>${list.map(e=>`<tr><td><b>${html(e.name)}</b><br/><small>${html(e.id)}</small></td><td><span class="employee-code">${html(e.login_code)}</span></td><td>${e.is_active?'<span class="badge-ok">启用</span>':'<span class="badge-bad">停用</span>'}</td><td>${e.bound_device_id?'<span class="badge-ok">已绑定</span>':'<span class="badge-bad">未绑定</span>'}<br/><small>${html(e.last_login_at||"")}</small></td><td><button class="secondary" onclick="resetEmployeeDevice('${e.id}')">重置设备</button><button class="secondary" onclick="toggleEmployee('${e.id}',${!e.is_active})">${e.is_active?'停用':'启用'}</button><button class="danger" onclick="deleteEmployee('${e.id}')">删除</button></td></tr>`).join("")}</tbody></table>`;
+}
+async function createEmployee(){
+  try{
+    let name=$("newEmpName").value.trim(),code=$("newEmpCode").value.trim();
+    if(!name||!code) return alert("请填写员工姓名和授权码");
+    await employeeApi({action:"create",name,code});
+    alert("已创建员工授权");
+    loadEmployees();
+  }catch(err){alert(err.message||String(err))}
+}
+async function resetEmployeeDevice(id){
+  if(!confirm("确定重置这个员工的绑定设备？重置后他可以用新设备重新登录。")) return;
+  try{await employeeApi({action:"resetDevice",id});alert("已重置设备");loadEmployees()}catch(err){alert(err.message||String(err))}
+}
+async function toggleEmployee(id,active){
+  try{await employeeApi({action:"setActive",id,active});alert("已更新状态");loadEmployees()}catch(err){alert(err.message||String(err))}
+}
+async function deleteEmployee(id){
+  if(!confirm("确定删除这个员工授权？")) return;
+  try{await employeeApi({action:"delete",id});alert("已删除");loadEmployees()}catch(err){alert(err.message||String(err))}
+}
+
+function refreshAll(){renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();$("sideLogo").src=data.settings.brandLogo}function init(){applyCloudConfigFromUrl();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","roomSelect","weeksSelect","startDateSelect","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=employeeLogin;if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=employeeLogout;verifyEmployeeSession();applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=downloadImage;$("printPdf").onclick=()=>window.print();$("addSchool").onclick=()=>{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveData();refreshAll()};$("backupBtn").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="超能游学报价系统数据备份.json";a.click()};$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{data=normalize(JSON.parse(r.result));saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){localStorage.removeItem(STORAGE_KEY);data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData()}init();
