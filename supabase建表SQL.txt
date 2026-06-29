@@ -1,0 +1,30 @@
+-- 超能游学报价系统 V6 Supabase 建表 SQL
+-- Supabase → SQL Editor → New query → 粘贴全部运行
+
+create table if not exists public.super_study_data (
+  id text primary key,
+  payload jsonb not null,
+  updated_at timestamptz default now()
+);
+
+alter table public.super_study_data enable row level security;
+
+drop policy if exists "super_study_data_select" on public.super_study_data;
+drop policy if exists "super_study_data_insert" on public.super_study_data;
+drop policy if exists "super_study_data_update" on public.super_study_data;
+
+create policy "super_study_data_select"
+on public.super_study_data
+for select
+using (true);
+
+create policy "super_study_data_insert"
+on public.super_study_data
+for insert
+with check (true);
+
+create policy "super_study_data_update"
+on public.super_study_data
+for update
+using (true)
+with check (true);
