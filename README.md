@@ -1,114 +1,93 @@
-# 超能游学报价系统 V6 云端同步版
+# 超能游学报价系统 V7 长期稳定云端版
 
-## 本版解决的问题
+## 这个版本是为了长期稳定使用
 
-手机、员工电脑、管理员电脑可以读取同一份云端数据。
+目标：
 
-你在后台修改：
+- 设置一次，后期长期使用
+- 员工直接打开普通网址就能同步
+- 不需要给员工复杂的云端同步链接
+- 软件里不再填写 Supabase URL 和 Key
+- Supabase 密钥放在 Vercel 环境变量里
+- 浏览器不直接连接 Supabase，避免手机网络访问不了 Supabase 的问题
 
-- 学校
-- 课程
-- 房型
-- 价格
-- 学校独立优惠
-- 本地费用
-- 学杂费规则
-- 系统设置
+## 长期稳定架构
 
-员工手机重新打开后可以同步最新数据。
+用户手机 / 员工电脑
+→ 打开你的 Vercel 网站
+→ Vercel API 中转
+→ Supabase 数据库
 
-## 新增功能
+## 第一次设置步骤
 
-### 1. Supabase 云端同步
+### 1. Supabase 运行建表 SQL
 
-在系统设置里新增：
+Supabase → SQL Editor → New query
 
-V6 云端同步（Supabase）
-
-可以填写：
-
-- Supabase Project URL
-- Supabase anon public key
-- 数据表名
-- 数据ID
-
-### 2. 上传 / 拉取云端数据
-
-管理员可以：
-
-- 上传本地数据到云端
-- 从云端拉取数据
-
-### 3. 员工云端同步链接
-
-管理员设置好云端后，可以点击：
-
-复制员工云端同步链接
-
-员工第一次打开这个链接后，手机会自动保存云端配置，之后打开普通网址也可以读取云端数据。
-
-## Supabase 建表
-
-打开 Supabase：
-
-SQL Editor → New query
-
-粘贴文件：
+粘贴：
 
 supabase建表SQL.txt
 
-里的内容，然后运行。
+运行。
 
-## 使用步骤
+### 2. Vercel 设置环境变量
 
-1. 部署 V6 版本
-2. 登录管理员
-3. 系统设置 → V6 云端同步
-4. 填入 Supabase Project URL
-5. 填入 Supabase anon public key
-6. 点击保存云端配置
-7. 点击上传本地数据到云端
-8. 点击复制员工云端同步链接
-9. 把链接发给员工
+Vercel 项目 → Settings → Environment Variables
 
-## 重要说明
+添加：
 
-这是静态网页 + Supabase 的云端同步版。
+SUPABASE_URL
+https://你的项目ID.supabase.co
 
-员工界面仍然只能看到自动报价，但因为 Supabase anon key 在前端使用，所以这是内部管理版，不是银行级安全。如果以后要做真正员工账号、权限、防止员工技术性修改，需要升级到登录认证版。
+SUPABASE_SERVICE_ROLE_KEY
+粘贴 Supabase 的 service_role / secret key
 
-## 已保留 V5 全部功能
+可选：
+
+SUPABASE_TABLE = super_study_data
+SUPABASE_ROW = main
+
+### 3. 重新部署
+
+Vercel → Deployments → 最新部署 → Redeploy
+
+### 4. 软件里操作
+
+管理员登录 → 系统设置 → V7 长期稳定云端同步
+
+点击：
+
+测试云端连接
+
+然后点击：
+
+上传本地数据到云端
+
+完成后，员工直接打开普通网址即可同步。
+
+## 后期使用
+
+你以后只需要：
+
+管理员登录 → 修改学校/课程/房型/优惠/学杂费 → 保存
+
+系统会自动上传到云端。
+
+员工手机刷新页面，就会自动读取最新数据。
+
+## 已保留全部功能
 
 - 员工 / 管理员权限
-- 员工默认只能看自动报价
+- 员工只看自动报价
 - 每个学校独立优惠自动切换
 - 没有对应折扣不显示在报价单
-- 签证延期 Visa Extension 第9 / 12 / 16 / 20周自动切换金额
+- 签证延期第9/12/16/20周自动切换金额
 - ACR I-Card 第9周起自动计算
-- Books 4周 / 8周 / 12周金额设置
+- Books 4/8/12周金额设置
 - 宿舍押金、接机费不计入学杂费合计
 - 报价单底部标记宿舍押金、接机费不含
-- 课程课时显示
-- 学校价格单文字 / CSV 导入
-- 入学日期统一周日
-- PNG 报价单图片
+- 下载报价单图片全图水印，覆盖费用一和费用二
+- PNG 报价单
 - 一页 PDF
-- 下载图片全图水印，覆盖费用一、费用二区域
-- 超能游学 Logo
 - 微信报价复制
 - 报价记录保存
-- 数据导入 / 导出备份
-
-## 部署文件
-
-上传覆盖 GitHub 根目录：
-
-- index.html
-- styles.css
-- script.js
-- vercel.json
-- package.json
-- .npmrc
-- README.md
-- supabase建表SQL.txt
-- public/superstudy-logo.png

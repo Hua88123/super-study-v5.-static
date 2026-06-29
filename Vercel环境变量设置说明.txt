@@ -1,0 +1,38 @@
+Vercel 环境变量设置说明（V7长期稳定版）
+
+路径：
+Vercel 项目 → Settings → Environment Variables
+
+只需要添加 2 个必填变量：
+
+1.
+Name: SUPABASE_URL
+Value: https://你的项目ID.supabase.co
+
+注意：不要加 /rest/v1/
+
+2.
+Name: SUPABASE_SERVICE_ROLE_KEY
+Value: 粘贴 Supabase 的 service_role / secret key
+
+说明：
+这个 key 只放在 Vercel 服务器环境变量里，不会出现在网页前端，比放在软件里更稳定。
+
+可选变量，不填也可以：
+
+3.
+Name: SUPABASE_TABLE
+Value: super_study_data
+
+4.
+Name: SUPABASE_ROW
+Value: main
+
+添加完成后一定要重新部署：
+
+Vercel → Deployments → 最新部署右边三个点 → Redeploy
+
+之后进入软件：
+管理员登录 → 系统设置 → 测试云端连接 → 上传本地数据到云端
+
+以后员工直接打开普通网址即可自动同步。

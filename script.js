@@ -5,28 +5,13 @@ const defaultData={settings:{brandName:"超能游学",brandEn:"SUPER STUDY ABROA
 let data=loadData();let selectedSchoolId=data.schools[0].id;let editingSchoolId=selectedSchoolId;
 function $(id){return document.getElementById(id)}function clone(o){return JSON.parse(JSON.stringify(o))}function loadData(){try{let r=localStorage.getItem(STORAGE_KEY);if(r)return normalize(JSON.parse(r))}catch(e){}return clone(defaultData)}let cloudSaveTimer=null;
 function getCloudConfig(){
-  try{
-    return {enabled:false,url:"",anonKey:"",table:"super_study_data",rowId:"main",...(JSON.parse(localStorage.getItem(CLOUD_CONFIG_KEY)||"{}"))};
-  }catch(e){
-    return {enabled:false,url:"",anonKey:"",table:"super_study_data",rowId:"main"};
-  }
+  return {enabled:true};
 }
 function setCloudConfig(c){
-  localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify({enabled:!!c.enabled,url:c.url||"",anonKey:c.anonKey||"",table:c.table||"super_study_data",rowId:c.rowId||"main"}));
+  localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify({enabled:true}));
 }
 function applyCloudConfigFromUrl(){
-  let p=new URLSearchParams(location.search);
-  let url=p.get("cloudUrl")||p.get("supabaseUrl");
-  let key=p.get("cloudKey")||p.get("supabaseKey");
-  if(url&&key){
-    setCloudConfig({enabled:true,url,anonKey:key,table:p.get("cloudTable")||"super_study_data",rowId:p.get("cloudRow")||"main"});
-    try{history.replaceState(null,"",location.pathname)}catch(e){}
-  }
-}
-function cloudClient(){
-  let cfg=getCloudConfig();
-  if(!cfg.enabled||!cfg.url||!cfg.anonKey||!window.supabase)return null;
-  return window.supabase.createClient(cfg.url,cfg.anonKey);
+  // V7 长期稳定版：不需要员工同步链接参数，所有设备打开同一个网址都会自动读取云端。
 }
 function updateCloudStatus(msg,isBad=false){
   let el=$("cloudStatus");
@@ -37,19 +22,15 @@ function updateCloudStatus(msg,isBad=false){
 }
 function saveLocalOnly(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
 function scheduleCloudSave(){
-  let cfg=getCloudConfig();
-  if(!cfg.enabled)return;
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer=setTimeout(()=>uploadCloudData(true),900);
 }
 async function uploadCloudData(silent=false){
-  let cfg=getCloudConfig(),client=cloudClient();
-  if(!client){if(!silent)alert("云端未连接：请先填写 Supabase URL 和 anon key");return false}
   try{
     updateCloudStatus("正在上传到云端...");
-    let payload=JSON.parse(JSON.stringify(data));
-    let {error}=await client.from(cfg.table||"super_study_data").upsert({id:cfg.rowId||"main",payload,updated_at:new Date().toISOString()});
-    if(error)throw error;
+    let res=await fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({payload:data})});
+    let body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error)throw new Error(body.error||("HTTP "+res.status));
     updateCloudStatus("云端已同步："+new Date().toLocaleString());
     if(!silent)alert("已上传到云端");
     return true;
@@ -60,24 +41,23 @@ async function uploadCloudData(silent=false){
   }
 }
 async function loadCloudData(silent=false){
-  let cfg=getCloudConfig(),client=cloudClient();
-  if(!client){if(!silent)alert("云端未连接：请先填写 Supabase URL 和 anon key");return false}
   try{
-    updateCloudStatus("正在从云端读取...");
-    let {data:row,error}=await client.from(cfg.table||"super_study_data").select("payload,updated_at").eq("id",cfg.rowId||"main").maybeSingle();
-    if(error)throw error;
-    if(row&&row.payload){
-      data=normalize(row.payload);
+    updateCloudStatus("正在读取云端数据...");
+    let res=await fetch("/api/data",{cache:"no-store"});
+    let body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error)throw new Error(body.error||("HTTP "+res.status));
+    if(body.payload){
+      data=normalize(body.payload);
       saveLocalOnly();
       selectedSchoolId=data.schools[0]?.id;
       editingSchoolId=selectedSchoolId;
       refreshAll();
       applyRoleMode();
-      updateCloudStatus("已从云端同步："+new Date(row.updated_at||Date.now()).toLocaleString());
+      updateCloudStatus("已从云端同步："+new Date(body.updated_at||Date.now()).toLocaleString());
       if(!silent)alert("已从云端同步最新数据");
       return true;
     }else{
-      updateCloudStatus("云端暂无数据，请先点“上传本地数据到云端”");
+      updateCloudStatus("云端暂无数据。管理员请先点“上传本地数据到云端”。");
       if(!silent)alert("云端暂无数据，请先上传本地数据到云端");
       return false;
     }
@@ -88,35 +68,26 @@ async function loadCloudData(silent=false){
   }
 }
 async function copyCloudShareLink(){
-  let cfg=getCloudConfig();
-  if(!cfg.url||!cfg.anonKey)return alert("请先填写并保存云端配置");
   let u=new URL(location.href);
   u.search="";
   u.hash="";
-  u.searchParams.set("cloudUrl",cfg.url);
-  u.searchParams.set("cloudKey",cfg.anonKey);
-  u.searchParams.set("cloudTable",cfg.table||"super_study_data");
-  u.searchParams.set("cloudRow",cfg.rowId||"main");
   await navigator.clipboard.writeText(u.toString());
-  alert("已复制员工云端同步链接。员工第一次打开这个链接后，手机会自动保存云端配置。");
+  alert("已复制员工网址。V7 稳定版员工直接打开这个普通网址即可自动同步。");
+}
+async function testCloudConnection(){
+  let ok=await loadCloudData(true);
+  if(ok) alert("云端连接正常");
+  else alert("云端连接失败，请检查 Vercel 环境变量和 Supabase 建表 SQL");
 }
 function saveCloudSettings(){
-  setCloudConfig({
-    enabled:$("cloudEnabled").value==="true",
-    url:$("cloudUrl").value.trim(),
-    anonKey:$("cloudKey").value.trim(),
-    table:$("cloudTable").value.trim()||"super_study_data",
-    rowId:$("cloudRow").value.trim()||"main"
-  });
-  renderSettings();
-  updateCloudStatus(getCloudConfig().enabled?"云端配置已保存":"云端同步已关闭");
-  alert("云端配置已保存");
+  setCloudConfig({enabled:true});
+  updateCloudStatus("V7 云端同步已固定开启");
+  alert("V7 云端同步已开启，不需要在软件里填写 Supabase 信息");
 }
 async function autoLoadCloudData(){
-  let cfg=getCloudConfig();
-  if(cfg.enabled&&cfg.url&&cfg.anonKey) await loadCloudData(true);
+  await loadCloudData(true);
+  setInterval(()=>{if(!isAdminMode())loadCloudData(true)},5*60*1000);
 }
-
 function saveData(){saveLocalOnly();scheduleCloudSave()}function normalize(d){let b=clone(defaultData);d.settings={...b.settings,...(d.settings||{})};d.schools=(d.schools&&d.schools.length?d.schools:b.schools).map(s=>({...b.schools[0],...s,discounts:{...b.schools[0].discounts,...(s.discounts||{})},courses:s.courses||[],rooms:s.rooms||[],localFees:(s.localFees&&s.localFees.length?s.localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek}))),officialTotals:s.officialTotals||{},bookFees:{4:2500,8:4000,12:5500,...(s.bookFees||{})},visaFees:{9:7500,12:10000,16:13000,20:16000,...(s.visaFees||{})}}));d.records=d.records||[];return d}function currentSchool(){return data.schools.find(s=>s.id===selectedSchoolId)||data.schools[0]}function editingSchool(){return data.schools.find(s=>s.id===editingSchoolId)||data.schools[0]}function num(v){let n=Number(v);return Number.isFinite(n)?n:0}function money(n){return `${Math.round(num(n)).toLocaleString()} 美元`}function peso(n){return `${Math.round(num(n)).toLocaleString()} PHP`}function rmb(n){return `约 ${Math.round(num(n)).toLocaleString()} 元`}function html(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function formatDateLocal(date){let y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,"0"),d=String(date.getDate()).padStart(2,"0");return `${y}-${m}-${d}`}function nextSunday(){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+((7-d.getDay())%7));return d}function sundayOptions(count=140){let st=nextSunday(),arr=[];for(let i=0;i<count;i++){let d=new Date(st);d.setDate(st.getDate()+i*7);arr.push(formatDateLocal(d))}return arr}function addWeeks(ds,w){let d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+w*7);return formatDateLocal(d)}function longAmount(d,w){if(w>=24)return num(d.long24);if(w>=20)return num(d.long20);if(w>=16)return num(d.long16);if(w>=12)return num(d.long12);return 0}
 
@@ -313,7 +284,7 @@ function renderFeeEditor(){let s=editingSchool();s.bookFees=s.bookFees||{4:2500,
 function renderSettings(){
   let set=data.settings,cfg=getCloudConfig();
   $("settingsEditor").innerHTML=`<div class="editor-grid">${field("品牌中文","setBrand",set.brandName)}${field("品牌英文","setBrandEn",set.brandEn)}${field("美金汇率","setUsd",set.usdRate,"number")}${field("披索汇率","setPeso",set.pesoRate,"number")}${field("水印文字","setWatermark",set.watermarkText)}<label>是否开启网页水印（下载图片默认强制显示）<select id="setWatermarkEnabled"><option value="true" ${set.watermarkEnabled?"selected":""}>开启</option><option value="false" ${!set.watermarkEnabled?"selected":""}>关闭</option></select></label>${field("优势标题","setAdvTitle",set.agencyAdvantageTitle)}${field("优势1","setAdv1",set.agencyAdvantageLine1)}${field("优势2","setAdv2",set.agencyAdvantageLine2)}${field("管理员密码","setAdminPassword",set.adminPassword||"SuperStudy888","text","员工不知道这个密码就只能看到自动报价")}<label>上传 Logo<input type="file" id="logoUpload" accept="image/*"/></label></div><img class="logo-preview" src="${set.brandLogo}"/><div class="btn-row"><button onclick="saveSettings()">保存系统设置</button></div>
-  <div class="sub-box cloud-box"><h3>V6 云端同步（Supabase）</h3><p class="muted">开启后，你在后台修改学校、价格、优惠、本地费用，员工手机会读取同一份云端数据。</p><div class="editor-grid"><label>是否开启云端同步<select id="cloudEnabled"><option value="true" ${cfg.enabled?"selected":""}>开启</option><option value="false" ${!cfg.enabled?"selected":""}>关闭</option></select></label>${field("Supabase Project URL","cloudUrl",cfg.url||"","text","例如：https://xxxx.supabase.co")}${field("Supabase anon public key","cloudKey",cfg.anonKey||"","text","Supabase API Settings 里的 anon public key")}${field("数据表名","cloudTable",cfg.table||"super_study_data","text")}${field("数据ID","cloudRow",cfg.rowId||"main","text")}</div><div class="btn-row"><button onclick="saveCloudSettings()">保存云端配置</button><button onclick="uploadCloudData(false)">上传本地数据到云端</button><button onclick="loadCloudData(false)">从云端拉取数据</button><button onclick="copyCloudShareLink()">复制员工云端同步链接</button></div><div id="cloudStatus" class="cloud-status">${cfg.enabled?"云端同步已开启":"云端同步未开启"}</div><p class="muted">第一次设置：先保存云端配置 → 上传本地数据到云端 → 复制员工云端同步链接发给员工。</p></div>`;
+  <div class="sub-box cloud-box"><h3>V7 长期稳定云端同步</h3><p class="muted">软件里不再填写 Supabase URL 和 Key，全部放在 Vercel 环境变量里。设置好以后，员工直接打开普通网址就会自动同步。</p><div class="btn-row"><button onclick="testCloudConnection()">测试云端连接</button><button onclick="uploadCloudData(false)">上传本地数据到云端</button><button onclick="loadCloudData(false)">从云端刷新数据</button><button onclick="copyCloudShareLink()">复制员工网址</button></div><div id="cloudStatus" class="cloud-status">V7 云端同步已固定开启</div><p class="muted">第一次只需要：Vercel 环境变量设置好 → 重新部署 → 上传本地数据到云端。之后长期使用不用再设置。</p></div>`;
   $("logoUpload").addEventListener("change",e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{data.settings.brandLogo=r.result;saveData();refreshAll()};r.readAsDataURL(file)})
 }
 function saveSettings(){let set=data.settings;set.brandName=$("setBrand").value;set.brandEn=$("setBrandEn").value;set.usdRate=num($("setUsd").value);set.pesoRate=num($("setPeso").value);set.watermarkText=$("setWatermark").value;set.watermarkEnabled=$("setWatermarkEnabled").value==="true";set.agencyAdvantageTitle=$("setAdvTitle").value;set.agencyAdvantageLine1=$("setAdv1").value;set.agencyAdvantageLine2=$("setAdv2").value;set.adminPassword=$("setAdminPassword").value||"SuperStudy888";saveData();refreshAll();alert("已保存")}

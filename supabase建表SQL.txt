@@ -1,4 +1,4 @@
--- 超能游学报价系统 V6 Supabase 建表 SQL
+-- 超能游学报价系统 V7 Supabase 建表 SQL
 -- Supabase → SQL Editor → New query → 粘贴全部运行
 
 create table if not exists public.super_study_data (
@@ -7,24 +7,6 @@ create table if not exists public.super_study_data (
   updated_at timestamptz default now()
 );
 
-alter table public.super_study_data enable row level security;
-
-drop policy if exists "super_study_data_select" on public.super_study_data;
-drop policy if exists "super_study_data_insert" on public.super_study_data;
-drop policy if exists "super_study_data_update" on public.super_study_data;
-
-create policy "super_study_data_select"
-on public.super_study_data
-for select
-using (true);
-
-create policy "super_study_data_insert"
-on public.super_study_data
-for insert
-with check (true);
-
-create policy "super_study_data_update"
-on public.super_study_data
-for update
-using (true)
-with check (true);
+-- V7 通过 Vercel 服务器访问 Supabase，密钥不放在浏览器里。
+-- 这里关闭 RLS，减少后期权限报错，适合内部报价系统长期稳定使用。
+alter table public.super_study_data disable row level security;
