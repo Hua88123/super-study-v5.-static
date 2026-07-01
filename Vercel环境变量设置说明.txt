@@ -1,4 +1,4 @@
-Vercel 环境变量设置说明（V8员工授权单设备登录版）
+Vercel 环境变量设置说明（V9多中介白标授权版）
 
 必填：
 
@@ -17,7 +17,7 @@ Name: ADMIN_PASSWORD
 Value: 你的管理员密码
 
 说明：
-V8 的员工授权管理接口会用 ADMIN_PASSWORD 校验管理员身份。
+V9 的员工授权、中介授权、云端保存都会用 ADMIN_PASSWORD 校验管理员身份。
 如果不设置，默认管理员密码是 SuperStudy888。
 
 可选：
@@ -34,4 +34,12 @@ Value: main
 Name: SUPABASE_EMPLOYEE_TABLE
 Value: super_study_employees
 
-设置后必须 Redeploy。
+7.
+Name: SUPABASE_AGENT_TABLE
+Value: super_study_agents
+
+8.
+Name: SUPABASE_AGENT_DEVICE_TABLE
+Value: super_study_agent_devices
+
+设置或修改后必须 Redeploy。

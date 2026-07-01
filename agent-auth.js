@@ -109,62 +109,53 @@ async function agentValid(req){
 function maskKey(key){return !key?"":(key.slice(0,8)+"..."+key.slice(-6))}
 function makeId(prefix){return prefix+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8)}
 
-module.exports = async function handler(req, res) {
-  try {
-    const debug = req.url && req.url.includes("debug=1");
-    if (debug) {
-      let result = {
-        ok: false,
-        env: {
-          SUPABASE_URL_present: !!SUPABASE_URL,
-          SUPABASE_URL_value: SUPABASE_URL || null,
-          SUPABASE_KEY_present: !!SUPABASE_KEY,
-          SUPABASE_KEY_masked: maskKey(SUPABASE_KEY),
-          SUPABASE_TABLE: DATA_TABLE,
-          SUPABASE_ROW: DATA_ROW,
-          node: process.version
-        }
-      };
-      try {
-        const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
-        const r = await sbRequest("GET", path);
-        result.ok = r.ok;
-        result.supabase_status = r.status;
-        result.supabase_response_preview = r.text.slice(0,500);
-      } catch(err) {
-        result.error = err.message || String(err);
-        result.code = err.code || null;
+module.exports = async function handler(req,res){
+  try{
+    if(req.method!=="POST") return json(res,405,{error:"Method not allowed"});
+    const raw=await readBody(req);
+    const body=raw?JSON.parse(raw):{};
+    const action=body.action;
+
+    if(action==="login"){
+      const slug=String(body.slug||"").trim();
+      const code=String(body.code||"").trim();
+      const deviceId=String(body.deviceId||"").trim();
+      const deviceName=String(body.deviceName||"").trim().slice(0,200);
+      if(!slug||!code||!deviceId) return json(res,400,{error:"缺少中介编号、授权码或设备ID"});
+      const r=await sbRequest("GET",`/rest/v1/${encodeURIComponent(AGENT_TABLE)}?id=eq.${encodeURIComponent(slug)}&login_code=eq.${encodeURIComponent(code)}&select=*`);
+      if(!r.ok) return json(res,r.status,{error:r.text});
+      const a=(JSON.parse(r.text||"[]"))[0];
+      if(!a) return json(res,401,{error:"中介授权码不存在或不匹配"});
+      if(!a.is_active) return json(res,403,{error:"该中介授权已停用"});
+      if(!notExpired(a)) return json(res,403,{error:"该中介授权已到期"});
+      const devPath=`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?agent_id=eq.${encodeURIComponent(a.id)}&select=*`;
+      const dr=await sbRequest("GET",devPath);
+      if(!dr.ok) return json(res,dr.status,{error:dr.text});
+      const devices=JSON.parse(dr.text||"[]");
+      const exists=devices.find(d=>d.device_id===deviceId);
+      const max=Number(a.max_devices||1);
+      if(!exists && devices.length>=max){
+        return json(res,403,{error:`该中介授权最多绑定 ${max} 台设备，当前设备无法登录。请联系总号重置设备。`});
       }
-      return json(res,200,result);
+      const payload={agent_id:a.id,device_id:deviceId,device_name:deviceName,last_login_at:new Date().toISOString()};
+      const up=await sbRequest("POST",`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?on_conflict=agent_id,device_id`,payload);
+      if(!up.ok) return json(res,up.status,{error:up.text});
+      return json(res,200,{agent:agentSafe(a)});
     }
 
-    const admin = isAdmin(req);
-    const empOk = await employeeValid(req).catch(()=>false);
-    const agOk = await agentValid(req).catch(()=>false);
-
-    if (req.method === "GET") {
-      if(!admin && !empOk && !agOk) return json(res, 401, {error:"未授权，请先登录员工/中介或管理员"});
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
-      const r = await sbRequest("GET", path);
-      if(!r.ok) return json(res,r.status,{error:r.text});
-      const rows=JSON.parse(r.text||"[]");
-      return json(res,200,rows[0]||{});
+    if(action==="check"){
+      const agentId=String(body.agentId||"").trim();
+      const deviceId=String(body.deviceId||"").trim();
+      const a=agentId?await getAgent(agentId):null;
+      if(!a || !a.is_active || !notExpired(a)) return json(res,200,{valid:false});
+      const p=`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?agent_id=eq.${encodeURIComponent(agentId)}&device_id=eq.${encodeURIComponent(deviceId)}&select=*`;
+      const r=await sbRequest("GET",p);
+      const valid=r.ok && (JSON.parse(r.text||"[]")).length>0;
+      return json(res,200,{valid,agent:valid?agentSafe(a):null});
     }
 
-    if (req.method === "POST") {
-      if(!admin) return json(res, 403, {error:"只有管理员可以上传修改数据"});
-      const raw = await readBody(req);
-      const body = raw ? JSON.parse(raw) : {};
-      if(!body.payload) return json(res,400,{error:"缺少 payload"});
-      const payload={id:DATA_ROW,payload:body.payload,updated_at:new Date().toISOString()};
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?on_conflict=id`;
-      const r = await sbRequest("POST", path, payload);
-      if(!r.ok) return json(res,r.status,{error:r.text});
-      return json(res,200,{ok:true});
-    }
-
-    return json(res,405,{error:"Method not allowed"});
-  } catch(err) {
+    return json(res,400,{error:"未知操作"});
+  }catch(err){
     return json(res,500,{error:err.message||String(err),code:err.code||null});
   }
 };

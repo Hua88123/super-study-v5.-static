@@ -3,7 +3,7 @@ const CLOUD_CONFIG_KEY="super-study-cloud-config-v6";
 const feeTemplate=[["SSP特别学习许可",12000,false],["SSPI-Card",4000,false],["签证延期 Visa Extension",7500,false],["ACR I-Card（超过59天必须办理）",3500,false],["预估教材费 Books",2500,false],["水电费 Utilities",800,true],["设施管理 Maintenance",500,true],["学生证 Student ID",300,false],["接机费 Airport Pick-up",1200,false],["宿舍押金 Dorm Deposit",5000,false]];
 const defaultData={settings:{brandName:"超能游学",brandEn:"SUPER STUDY ABROAD",brandLogo:"./public/superstudy-logo.png",usdRate:7.2,pesoRate:.13,watermarkEnabled:true,watermarkText:"超能游学",agencyAdvantageTitle:"超能游学优势",agencyAdvantageLine1:"全程协助报名、签证、入学",agencyAdvantageLine2:"透明报价，售后跟进更安心",adminPassword:"SuperStudy888"},schools:[{id:"cg-banilad",name:"CG",campus:"Banilad校区",courses:[{id:"esl",name:"ESL加强课",price4w:750,note:"",lessonText:"1对1 5节，团课1节，选修课 2节"},{id:"ielts",name:"IELTS基础课",price4w:850,note:"雅思基础强化",lessonText:"1对1 4节，团课2节，选修课2节"}],rooms:[{id:"hotel",name:"校外酒店",price4w:1500},{id:"triple",name:"3人间宿舍",price4w:700},{id:"quad",name:"4人间宿舍",price4w:650}],discounts:{registrationFee:100,lowSeasonDiscountPer4w:150,schoolLowSeasonDiscountRate:1,peakFeePerWeek:40,agencyDiscountRate:.9,registrationWaiverAmount:100,long8:0,long12:50,long16:100,long20:150,long24:200,schoolPromoTitle:"学校优惠",schoolPromoText:"淡季每4周减免，可叠加长期优惠，具体以学校最新政策为准。",lowSeasonEnabled:true,schoolLowSeasonRateEnabled:false,peakSeasonEnabled:false,longDiscountEnabled:true,agencyDiscountEnabled:true,registrationWaiverEnabled:false},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}}],records:[]};
 let data=loadData();let selectedSchoolId=data.schools[0].id;let editingSchoolId=selectedSchoolId;
-function $(id){return document.getElementById(id)}function clone(o){return JSON.parse(JSON.stringify(o))}function loadData(){try{let r=localStorage.getItem(STORAGE_KEY);if(r)return normalize(JSON.parse(r))}catch(e){}return clone(defaultData)}let cloudSaveTimer=null;
+function $(id){return document.getElementById(id)}function clone(o){return JSON.parse(JSON.stringify(o))}function loadData(){try{let r=localStorage.getItem(currentStorageKey());if(r)return normalize(JSON.parse(r))}catch(e){}return clone(defaultData)}let cloudSaveTimer=null;
 function getCloudConfig(){
   return {enabled:true};
 }
@@ -20,7 +20,7 @@ function updateCloudStatus(msg,isBad=false){
     el.className=isBad?"cloud-status bad":"cloud-status";
   }
 }
-function saveLocalOnly(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
+function saveLocalOnly(){localStorage.setItem(currentStorageKey(),JSON.stringify(data))}
 function scheduleCloudSave(){
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer=setTimeout(()=>uploadCloudData(true),900);
@@ -48,6 +48,7 @@ async function loadCloudData(silent=false){
     if(!res.ok||body.error)throw new Error(body.error||("HTTP "+res.status));
     if(body.payload){
       data=normalize(body.payload);
+      if(isAgentMode())applyAgentBrandingToData();
       saveLocalOnly();
       selectedSchoolId=data.schools[0]?.id;
       editingSchoolId=selectedSchoolId;
@@ -72,7 +73,7 @@ async function copyCloudShareLink(){
   u.search="";
   u.hash="";
   await navigator.clipboard.writeText(u.toString());
-  alert("已复制员工网址。V7 稳定版员工直接打开这个普通网址即可自动同步。");
+  alert("已复制员工网址。V9 稳定版员工直接打开这个普通网址即可自动同步。");
 }
 async function testCloudConnection(){
   let ok=await loadCloudData(true);
@@ -81,14 +82,14 @@ async function testCloudConnection(){
 }
 function saveCloudSettings(){
   setCloudConfig({enabled:true});
-  updateCloudStatus("V7 云端同步已固定开启");
-  alert("V7 云端同步已开启，不需要在软件里填写 Supabase 信息");
+  updateCloudStatus("V9 云端同步已固定开启");
+  alert("V9 云端同步已开启，不需要在软件里填写 Supabase 信息");
 }
 async function autoLoadCloudData(){
   // 管理员后台编辑时不自动从云端拉取，避免新增学校/编辑价格时被云端旧数据覆盖导致页面跳出。
   // 员工端自动同步云端数据。
-  if(isEmployeeLoggedIn()) await loadCloudData(true);
-  setInterval(()=>{if(isEmployeeLoggedIn())loadCloudData(true)},5*60*1000);
+  if(isEmployeeLoggedIn()||isAgentLoggedIn()) await loadCloudData(true);
+  setInterval(()=>{if(isEmployeeLoggedIn()||isAgentLoggedIn())loadCloudData(true)},5*60*1000);
 }
 function saveData(){saveLocalOnly();scheduleCloudSave()}function normalize(d){let b=clone(defaultData);d.settings={...b.settings,...(d.settings||{})};d.schools=(d.schools&&d.schools.length?d.schools:b.schools).map(s=>({...b.schools[0],...s,discounts:{...b.schools[0].discounts,...(s.discounts||{})},courses:s.courses||[],rooms:s.rooms||[],localFees:(s.localFees&&s.localFees.length?s.localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek}))),officialTotals:s.officialTotals||{},bookFees:{4:2500,8:4000,12:5500,...(s.bookFees||{})},visaFees:{9:7500,12:10000,16:13000,20:16000,...(s.visaFees||{})}}));d.records=d.records||[];return d}function currentSchool(){return data.schools.find(s=>s.id===selectedSchoolId)||data.schools[0]}function editingSchool(){return data.schools.find(s=>s.id===editingSchoolId)||data.schools[0]}function num(v){let n=Number(v);return Number.isFinite(n)?n:0}function money(n){return `${Math.round(num(n)).toLocaleString()} 美元`}function peso(n){return `${Math.round(num(n)).toLocaleString()} PHP`}function rmb(n){return `约 ${Math.round(num(n)).toLocaleString()} 元`}function html(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function formatDateLocal(date){let y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,"0"),d=String(date.getDate()).padStart(2,"0");return `${y}-${m}-${d}`}function nextSunday(){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+((7-d.getDay())%7));return d}function sundayOptions(count=140){let st=nextSunday(),arr=[];for(let i=0;i<count;i++){let d=new Date(st);d.setDate(st.getDate()+i*7);arr.push(formatDateLocal(d))}return arr}function addWeeks(ds,w){let d=new Date(ds+"T00:00:00");d.setDate(d.getDate()+w*7);return formatDateLocal(d)}function longAmount(d,w){if(w>=24)return num(d.long24);if(w>=20)return num(d.long20);if(w>=16)return num(d.long16);if(w>=12)return num(d.long12);if(w>=8)return num(d.long8);return 0}
@@ -333,7 +334,7 @@ async function saveCanvasImage(canvas, filename){
   }
 }
 
-async function downloadImage(){let c=calc(),set=data.settings,s=c.school,canvas=document.createElement("canvas"),W=1080,H=1528;canvas.width=W*2;canvas.height=H*2;let ctx=canvas.getContext("2d");ctx.scale(2,2);ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);let logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");let grad=ctx.createLinearGradient(0,0,W,180);grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.6,"#fff");grad.addColorStop(1,"#fff3c0");ctx.fillStyle=grad;ctx.fillRect(0,0,W,180);if(logo)ctx.drawImage(logo,32,20,130,130);ctx.fillStyle="#0639a6";ctx.font="bold 52px sans-serif";ctx.fillText(`${s.name} ${s.campus}`,180,65);ctx.font="bold 40px sans-serif";ctx.fillText(`游学报价单（${c.weeks}周）`,180,120);ctx.fillStyle="#0798e8";rr(ctx,180,138,520,40,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("超能游学 · 透明报价 · 安心之选",220,166);[["学校",s.name,s.campus],["时间",`${c.weeks}周`,`${c.startDate} 入学`],["课程",c.course?.name||"-",courseLesson(c.course)||c.course?.note||""],["房型",c.room?.name||"-","住宿按所选房型"],["注册金",`${c.originalRegistrationFee}美元/人`,""]].forEach((it,i)=>{let x=32+i*206,y=205;rr(ctx,x,y,196,126,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.font="bold 22px sans-serif";ctx.fillText(it[0],x+16,y+32);ctx.fillStyle="#111b63";ctx.font="bold 20px sans-serif";t(ctx,it[1],x+16,y+70,164,24,2);ctx.fillStyle="#667395";ctx.font="14px sans-serif";t(ctx,it[2],x+16,y+105,164,16,2)});let promoY=350;rr(ctx,32,promoY,480,96,18);ctx.fillStyle="#fff5f5";ctx.fill();ctx.strokeStyle="#ffd7d7";ctx.stroke();ctx.fillStyle="#e4251a";ctx.font="bold 24px sans-serif";ctx.fillText(s.discounts.schoolPromoTitle,56,promoY+34);ctx.fillStyle="#17214d";ctx.font="17px sans-serif";t(ctx,s.discounts.schoolPromoText,56,promoY+64,430,20,2);rr(ctx,534,promoY,514,96,18);ctx.fillStyle="#f7f9ff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.font="bold 24px sans-serif";ctx.fillText(set.agencyAdvantageTitle,558,promoY+34);ctx.font="18px sans-serif";ctx.fillText(`✓ ${set.agencyAdvantageLine1}`,558,promoY+65);ctx.fillText(`✓ ${set.agencyAdvantageLine2}`,558,promoY+90);let px=32,py=470,pw=500,ph=520;rr(ctx,px,py,pw,ph,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";rr(ctx,px,py,pw,54,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("费用一：学费 & 住宿费（美元）",px+20,py+35);let usd=buildUsdRows(c,s);drawRows(ctx,["项目","说明","金额","备注"],usd,44,py+70,pw-24,39);ctx.fillStyle="#fff";ctx.fillRect(48,py+ph-70,pw-32,52);ctx.fillStyle="#0639a6";ctx.font="bold 27px sans-serif";ctx.fillText("费用一合计：",64,py+ph-35);ctx.fillStyle="#e4251a";ctx.font="bold 36px sans-serif";ctx.fillText(`${Math.round(c.totalUsd).toLocaleString()} 美元`,250,py+ph-35);let gx=548;rr(ctx,gx,py,pw,ph,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0b7a48";rr(ctx,gx,py,pw,54,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("费用二：到校支付费用（披索）",gx+20,py+35);let php=c.localItems.slice(0,10).map(it=>[it.name.replace("（超过59天必须办理）",""),it.perWeek?`${it.amount}PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),Math.round(it.total??it.amount).toLocaleString(),it.excluded?"不含合计":(it.note||"")]);drawRows(ctx,["项目","说明","金额","备注"],php,560,py+70,pw-24,36);ctx.fillStyle="#fff";ctx.fillRect(564,py+ph-70,pw-32,52);ctx.fillStyle="#0b7a48";ctx.font="bold 27px sans-serif";ctx.fillText("费用二合计：",580,py+ph-35);ctx.font="bold 33px sans-serif";ctx.fillText(`${Math.round(c.localPeso).toLocaleString()} PHP`,770,py+ph-35);let sy=1016;rr(ctx,32,sy,1016,286,24);ctx.fillStyle="#fbfdff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.textAlign="center";ctx.font="bold 34px sans-serif";ctx.fillText("本次游学总计（以实际汇率为准）",W/2,sy+48);ctx.textAlign="left";let by=sy+78;[["美元部分",`${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}`,rmb(c.tuitionRmb),"#0639a6"],["披索部分",`${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}`,rmb(c.localRmb),"#0b7a48"]].forEach((b,i)=>{let x=60+i*386;rr(ctx,x,by,300,112,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle=b[3];ctx.font="bold 20px sans-serif";ctx.fillText(b[0],x+26,by+38);ctx.fillStyle="#17214d";ctx.font="15px sans-serif";ctx.fillText(b[1],x+26,by+66);ctx.fillStyle=b[3];ctx.font="bold 22px sans-serif";ctx.fillText(b[2],x+26,by+94)});ctx.fillStyle="#0639a6";ctx.font="bold 44px sans-serif";ctx.fillText("+",384,by+70);ctx.fillText("≈",800,by+70);ctx.fillStyle="#e4251a";ctx.font="bold 54px sans-serif";ctx.fillText(`${Math.round(c.totalRmb).toLocaleString()}`,860,by+66);ctx.font="bold 24px sans-serif";ctx.fillText("人民币",900,by+100);rr(ctx,32,1332,1016,110,20);ctx.fillStyle="#fff7e8";ctx.fill();ctx.strokeStyle="#ffd98c";ctx.stroke();ctx.fillStyle="#17214d";ctx.font="bold 20px sans-serif";ctx.fillText(`选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务`,58,1372);ctx.font="17px sans-serif";ctx.fillText("备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。",58,1410);let wmText=set.watermarkText||set.brandName||"超能游学";ctx.save();ctx.globalAlpha=.075;ctx.translate(W/2,H/2);ctx.rotate(-Math.PI/6);for(let yy=-2200;yy<=2200;yy+=105){for(let xx=-1800;xx<=1800;xx+=180){if(logo){ctx.drawImage(logo,xx,yy-16,28,28)}ctx.fillStyle="#0639a6";ctx.font="bold 20px sans-serif";ctx.fillText(wmText,xx+34,yy+4)}}ctx.restore();await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`)}
+async function downloadImage(){let c=calc(),set=data.settings,s=c.school,canvas=document.createElement("canvas"),W=1080,H=1700;canvas.width=W*2;canvas.height=H*2;let ctx=canvas.getContext("2d");ctx.scale(2,2);ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);let logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");let grad=ctx.createLinearGradient(0,0,W,180);grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.6,"#fff");grad.addColorStop(1,"#fff3c0");ctx.fillStyle=grad;ctx.fillRect(0,0,W,180);if(logo)ctx.drawImage(logo,32,20,130,130);ctx.fillStyle="#0639a6";ctx.font="bold 52px sans-serif";ctx.fillText(`${s.name} ${s.campus}`,180,65);ctx.font="bold 40px sans-serif";ctx.fillText(`游学报价单（${c.weeks}周）`,180,120);ctx.fillStyle="#0798e8";rr(ctx,180,138,520,40,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("超能游学 · 透明报价 · 安心之选",220,166);[["学校",s.name,s.campus],["时间",`${c.weeks}周`,`${c.startDate} 入学`],["课程",c.course?.name||"-",courseLesson(c.course)||c.course?.note||""],["房型",c.room?.name||"-","住宿按所选房型"],["注册金",`${c.originalRegistrationFee}美元/人`,""]].forEach((it,i)=>{let x=32+i*206,y=205;rr(ctx,x,y,196,126,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.font="bold 22px sans-serif";ctx.fillText(it[0],x+16,y+32);ctx.fillStyle="#111b63";ctx.font="bold 20px sans-serif";t(ctx,it[1],x+16,y+70,164,24,2);ctx.fillStyle="#667395";ctx.font="14px sans-serif";t(ctx,it[2],x+16,y+105,164,16,2)});let promoY=350;rr(ctx,32,promoY,480,96,18);ctx.fillStyle="#fff5f5";ctx.fill();ctx.strokeStyle="#ffd7d7";ctx.stroke();ctx.fillStyle="#e4251a";ctx.font="bold 24px sans-serif";ctx.fillText(s.discounts.schoolPromoTitle,56,promoY+34);ctx.fillStyle="#17214d";ctx.font="17px sans-serif";t(ctx,s.discounts.schoolPromoText,56,promoY+64,430,20,2);rr(ctx,534,promoY,514,96,18);ctx.fillStyle="#f7f9ff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.font="bold 24px sans-serif";ctx.fillText(set.agencyAdvantageTitle,558,promoY+34);ctx.font="18px sans-serif";ctx.fillText(`✓ ${set.agencyAdvantageLine1}`,558,promoY+65);ctx.fillText(`✓ ${set.agencyAdvantageLine2}`,558,promoY+90);let px=32,py=470,pw=500,ph=650;rr(ctx,px,py,pw,ph,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";rr(ctx,px,py,pw,54,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("费用一：学费 & 住宿费（美元）",px+20,py+35);let usd=buildUsdRows(c,s);drawRows(ctx,["项目","说明","金额","备注"],usd,44,py+70,pw-24,44);ctx.fillStyle="#fff";ctx.fillRect(48,py+ph-70,pw-32,52);ctx.fillStyle="#0639a6";ctx.font="bold 27px sans-serif";ctx.fillText("费用一合计：",64,py+ph-35);ctx.fillStyle="#e4251a";ctx.font="bold 36px sans-serif";ctx.fillText(`${Math.round(c.totalUsd).toLocaleString()} 美元`,250,py+ph-35);let gx=548;rr(ctx,gx,py,pw,ph,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0b7a48";rr(ctx,gx,py,pw,54,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("费用二：到校支付费用（披索）",gx+20,py+35);let php=c.localItems.slice(0,10).map(it=>[it.name.replace("（超过59天必须办理）",""),it.perWeek?`${it.amount}PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),Math.round(it.total??it.amount).toLocaleString(),it.excluded?"不含合计":(it.note||"")]);drawRows(ctx,["项目","说明","金额","备注"],php,560,py+70,pw-24,50);ctx.fillStyle="#fff";ctx.fillRect(564,py+ph-70,pw-32,52);ctx.fillStyle="#0b7a48";ctx.font="bold 27px sans-serif";ctx.fillText("费用二合计：",580,py+ph-35);ctx.font="bold 33px sans-serif";ctx.fillText(`${Math.round(c.localPeso).toLocaleString()} PHP`,770,py+ph-35);let sy=1156;rr(ctx,32,sy,1016,286,24);ctx.fillStyle="#fbfdff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.textAlign="center";ctx.font="bold 34px sans-serif";ctx.fillText("本次游学总计（以实际汇率为准）",W/2,sy+48);ctx.textAlign="left";let by=sy+78;[["美元部分",`${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}`,rmb(c.tuitionRmb),"#0639a6"],["披索部分",`${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}`,rmb(c.localRmb),"#0b7a48"]].forEach((b,i)=>{let x=60+i*386;rr(ctx,x,by,300,112,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle=b[3];ctx.font="bold 20px sans-serif";ctx.fillText(b[0],x+26,by+38);ctx.fillStyle="#17214d";ctx.font="15px sans-serif";ctx.fillText(b[1],x+26,by+66);ctx.fillStyle=b[3];ctx.font="bold 22px sans-serif";ctx.fillText(b[2],x+26,by+94)});ctx.fillStyle="#0639a6";ctx.font="bold 44px sans-serif";ctx.fillText("+",384,by+70);ctx.fillText("≈",800,by+70);ctx.fillStyle="#e4251a";ctx.font="bold 54px sans-serif";ctx.fillText(`${Math.round(c.totalRmb).toLocaleString()}`,860,by+66);ctx.font="bold 24px sans-serif";ctx.fillText("人民币",900,by+100);rr(ctx,32,1480,1016,120,20);ctx.fillStyle="#fff7e8";ctx.fill();ctx.strokeStyle="#ffd98c";ctx.stroke();ctx.fillStyle="#17214d";ctx.font="bold 20px sans-serif";ctx.fillText(`选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务`,58,1522);ctx.font="17px sans-serif";ctx.fillText("备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。",58,1564);let wmText=set.watermarkText||set.brandName||"超能游学";ctx.save();ctx.globalAlpha=.075;ctx.translate(W/2,H/2);ctx.rotate(-Math.PI/6);for(let yy=-2200;yy<=2200;yy+=105){for(let xx=-1800;xx<=1800;xx+=180){if(logo){ctx.drawImage(logo,xx,yy-16,28,28)}ctx.fillStyle="#0639a6";ctx.font="bold 20px sans-serif";ctx.fillText(wmText,xx+34,yy+4)}}ctx.restore();await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`)}
 function renderRecords(){$("recordsList").innerHTML=data.records.length?data.records.map((r,i)=>`<div class="list-item"><div><b>${r.title}</b><br/><span class="muted">${r.createdAt}</span></div><div class="list-actions"><button onclick="navigator.clipboard.writeText(data.records[${i}].text)">复制</button><button class="danger" onclick="deleteRecord(${i})">删除</button></div></div>`).join(""):`<p class="muted">暂无报价记录</p>`}function deleteRecord(i){data.records.splice(i,1);saveData();renderRecords()}
 function renderSchoolList(){$("schoolList").innerHTML=data.schools.map(s=>`<div class="list-item"><div><b>${s.name} ${s.campus}</b><br/><span class="muted">${s.courses.length}个课程 / ${s.rooms.length}个房型</span></div><div class="list-actions"><button onclick="editSchool('${s.id}')">编辑</button><button class="danger" onclick="removeSchool('${s.id}')">删除</button></div></div>`).join("")}function editSchool(id){editingSchoolId=id;renderSchoolEditor();renderFeeEditor()}function removeSchool(id){if(data.schools.length<=1)return alert("至少保留一个学校");data.schools=data.schools.filter(s=>s.id!==id);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;saveData();refreshAll()}
 function field(label,id,value,type="text",ph=""){return `<label>${label}<input id="${id}" type="${type}" step="0.01" value="${html(value)}" placeholder="${ph}"/></label>`}function renderSchoolEditor(){let s=editingSchool();$("schoolEditor").innerHTML=`<div class="editor-grid">${field("学校名称","edName",s.name)}${field("校区","edCampus",s.campus)}${field("注册费","edReg",s.discounts.registrationFee,"number")}${field("淡季优惠/4周","edLow",s.discounts.lowSeasonDiscountPer4w,"number")}${field("学校淡季折扣比例","edSchoolRate",s.discounts.schoolLowSeasonDiscountRate,"number","1=无折扣 0.9=9折 0.5=5折")}${field("旺季附加/周","edPeak",s.discounts.peakFeePerWeek,"number")}${field("超能折扣比例","edAgency",s.discounts.agencyDiscountRate,"number")}${field("超能减免注册金金额","edWaive",s.discounts.registrationWaiverAmount,"number")}${field("8周长期优惠","edLong8",s.discounts.long8||0,"number")}${field("12周长期优惠","edLong12",s.discounts.long12,"number")}${field("16周长期优惠","edLong16",s.discounts.long16,"number")}${field("20周长期优惠","edLong20",s.discounts.long20,"number")}${field("24周长期优惠","edLong24",s.discounts.long24,"number")}</div><div class="sub-box"><h3>该学校默认启用的优惠</h3><div class="editor-grid">${yesNo("默认启用淡季优惠","edLowEnabled",s.discounts.lowSeasonEnabled!==false)}${yesNo("默认启用学校淡季折扣","edSchoolRateEnabled",!!s.discounts.schoolLowSeasonRateEnabled)}${yesNo("默认启用旺季附加","edPeakEnabled",!!s.discounts.peakSeasonEnabled)}${yesNo("默认启用长期优惠","edLongEnabled",s.discounts.longDiscountEnabled!==false)}${yesNo("默认启用超能折扣","edAgencyEnabled",s.discounts.agencyDiscountEnabled!==false)}${yesNo("默认启用减免注册金","edWaiveEnabled",!!s.discounts.registrationWaiverEnabled)}</div><p class="muted">以后选择这个学校时，系统会自动切换到这些优惠，不需要手动勾选。</p></div><label>学校优惠标题<input id="edPromoTitle" value="${html(s.discounts.schoolPromoTitle)}"/></label><label>学校优惠说明<textarea id="edPromoText">${html(s.discounts.schoolPromoText)}</textarea></label><div class="sub-box"><h3>价格单智能导入（文本/CSV）</h3><p class="muted">支持 TXT / CSV / 复制出来的价格表文字。图片或PDF需要先用OCR提取文字再粘贴。</p><input type="file" id="priceFile" accept=".txt,.csv,.md,.html,.json,.pdf,image/*"/><textarea id="priceText" placeholder="把学校价格单文字粘贴到这里，例如：\nCG Banilad\nESL加强课 1对1 5节 团课1节 选修2节 750 USD\n3人间宿舍 700 USD"></textarea><div class="btn-row"><button onclick="importPriceText()">识别并导入到当前学校</button></div><div id="importResult" class="muted"></div></div><div class="sub-box"><h3>课程价格（每4周/美元）</h3><div id="courseEdit"></div><button onclick="addCourse()">添加课程</button></div><div class="sub-box"><h3>房型价格（每4周/美元）</h3><div id="roomEdit"></div><button onclick="addRoom()">添加房型</button></div><button onclick="saveSchoolEditor()">保存学校设置</button>`;let pf=$("priceFile");if(pf)pf.addEventListener("change",handlePriceFile);renderCourseRoomEdit()}
@@ -353,6 +354,7 @@ const ADMIN_SESSION_KEY = "super-study-admin-session-v8";
 const ADMIN_PASS_KEY = "super-study-admin-pass-v8";
 const EMPLOYEE_SESSION_KEY = "super-study-employee-session-v8";
 const DEVICE_ID_KEY = "super-study-device-id-v8";
+const AGENT_SESSION_KEY = "super-study-agent-session-v9";
 
 function getDeviceId(){
   let id=localStorage.getItem(DEVICE_ID_KEY);
@@ -361,6 +363,46 @@ function getDeviceId(){
     localStorage.setItem(DEVICE_ID_KEY,id);
   }
   return id;
+}
+
+function getAgentSlug(){
+  return new URLSearchParams(location.search).get("agent") || "";
+}
+function isAgentMode(){
+  return !!getAgentSlug();
+}
+function getAgentSession(){
+  try{return JSON.parse(localStorage.getItem(AGENT_SESSION_KEY+"-"+getAgentSlug())||"null")}catch(e){return null}
+}
+function isAgentLoggedIn(){
+  return !!getAgentSession();
+}
+function currentStorageKey(){
+  return isAgentMode() ? `${STORAGE_KEY}-agent-${getAgentSlug()}` : STORAGE_KEY;
+}
+function clearAgentSession(){
+  localStorage.removeItem(AGENT_SESSION_KEY+"-"+getAgentSlug());
+}
+function applyAgentBrandingToData(){
+  const ag=getAgentSession();
+  if(!ag) return;
+  data.settings=data.settings||{};
+  data.settings.brandName=ag.brandName || ag.name || data.settings.brandName;
+  data.settings.brandEn=ag.brandEn || data.settings.brandEn;
+  data.settings.watermarkText=ag.watermarkText || ag.brandName || ag.name || data.settings.watermarkText;
+  if(ag.brandLogo) data.settings.brandLogo=ag.brandLogo;
+  data.settings.agencyAdvantageTitle=(ag.brandName||ag.name||"专属服务")+"优势";
+}
+function updateBrandChrome(){
+  const set=data.settings||{};
+  const logo=$("sideLogo");
+  if(logo) logo.src=set.brandLogo||"./public/superstudy-logo.png";
+  const strong=document.querySelector(".brand strong");
+  if(strong) strong.textContent=set.brandName||"超能游学";
+  const span=document.querySelector(".brand span");
+  if(span) span.textContent=set.brandEn||"SUPER STUDY";
+  const h=document.querySelector(".top h1");
+  if(h) h.textContent=(set.brandName||"超能游学")+"报价系统";
 }
 function getEmployeeSession(){
   try{return JSON.parse(localStorage.getItem(EMPLOYEE_SESSION_KEY)||"null")}catch(e){return null}
@@ -375,6 +417,12 @@ function authHeaders(){
   const h={};
   if(isAdminMode()){
     h["x-admin-password"]=getAdminPasswordForApi();
+  }else if(isAgentMode()){
+    const ag=getAgentSession();
+    if(ag&&ag.id){
+      h["x-agent-id"]=ag.id;
+      h["x-device-id"]=getDeviceId();
+    }
   }else{
     const emp=getEmployeeSession();
     if(emp&&emp.id){
@@ -393,7 +441,7 @@ function activateTab(tab){
   if(!isAdminMode() && tab !== "quote"){
     tab = "quote";
   }
-  if(!isAdminMode() && !isEmployeeLoggedIn()){
+  if(!isAdminMode() && !isEmployeeLoggedIn() && !isAgentLoggedIn()){
     tab = "quote";
   }
   document.querySelectorAll(".nav").forEach(b=>b.classList.remove("active"));
@@ -407,13 +455,15 @@ function activateTab(tab){
 function applyRoleMode(){
   const admin = isAdminMode();
   const emp = getEmployeeSession();
-  const logged = admin || !!emp;
+  const ag = getAgentSession();
+  const logged = admin || !!emp || !!ag;
   document.body.classList.toggle("admin-mode", admin);
-  document.body.classList.toggle("employee-mode", !admin);
+  document.body.classList.toggle("employee-mode", !admin && !ag);
+  document.body.classList.toggle("agent-mode", !!ag || isAgentMode());
   document.body.classList.toggle("locked-mode", !logged);
   const roleHint = $("roleHint");
   if(roleHint){
-    roleHint.textContent = admin ? "管理员模式：可查看全部功能" : (emp ? `员工模式：${emp.name || "已授权"} · 仅可自助报价` : "未登录：请先员工授权登录");
+    roleHint.textContent = admin ? "管理员模式：可查看全部功能" : (ag ? `中介白标模式：${ag.brandName || ag.name || "已授权"} · 仅可自动报价` : (emp ? `员工模式：${emp.name || "已授权"} · 仅可自助报价` : (isAgentMode() ? "未登录：请先输入中介授权码" : "未登录：请先员工授权登录")));
   }
   const logoutBtn=$("employeeLogoutBtn");
   if(logoutBtn) logoutBtn.style.display=(!admin && emp)?"block":"none";
@@ -429,7 +479,7 @@ function adminLogin(){
   if(password === realPassword){
     sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
     sessionStorage.setItem(ADMIN_PASS_KEY, password);
-    localStorage.removeItem(EMPLOYEE_SESSION_KEY);
+    localStorage.removeItem(EMPLOYEE_SESSION_KEY);clearAgentSession();
     applyRoleMode();
     refreshAll();
     alert("已进入管理员模式。如需读取云端数据，请到系统设置点“从云端刷新数据”。");
@@ -465,7 +515,7 @@ async function employeeLogin(){
 }
 
 function employeeLogout(){
-  localStorage.removeItem(EMPLOYEE_SESSION_KEY);
+  localStorage.removeItem(EMPLOYEE_SESSION_KEY);clearAgentSession();
   applyRoleMode();
   alert("已退出员工登录");
 }
@@ -477,11 +527,58 @@ async function verifyEmployeeSession(){
     const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"check",employeeId:emp.id,deviceId:getDeviceId()})});
     const body=await res.json().catch(()=>({}));
     if(!res.ok||body.error||!body.valid){
-      localStorage.removeItem(EMPLOYEE_SESSION_KEY);
+      localStorage.removeItem(EMPLOYEE_SESSION_KEY);clearAgentSession();
       applyRoleMode();
     }
   }catch(e){}
 }
+
+
+async function agentLogin(){
+  const input=$("employeeCodeInput");
+  const code=(input?.value||"").trim();
+  const slug=getAgentSlug();
+  if(!slug) return alert("缺少中介专属入口参数 agent");
+  if(!code) return alert("请输入中介授权码");
+  try{
+    const res=await fetch("/api/agent-auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"login",slug,code,deviceId:getDeviceId(),deviceName:navigator.userAgent.slice(0,120)})});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error) throw new Error(body.error||"登录失败");
+    localStorage.setItem(AGENT_SESSION_KEY+"-"+slug,JSON.stringify(body.agent));
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    sessionStorage.removeItem(ADMIN_PASS_KEY);
+    localStorage.removeItem(EMPLOYEE_SESSION_KEY);
+    applyAgentBrandingToData();
+    applyRoleMode();
+    await loadCloudData(true);
+    applyAgentBrandingToData();
+    refreshAll();
+    alert("中介授权登录成功");
+  }catch(err){
+    alert(err.message||String(err));
+  }
+}
+function agentLogout(){
+  clearAgentSession();
+  applyRoleMode();
+  alert("已退出中介授权登录");
+}
+async function verifyAgentSession(){
+  const ag=getAgentSession();
+  if(!ag || isAdminMode()) return;
+  try{
+    const res=await fetch("/api/agent-auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"check",agentId:ag.id,deviceId:getDeviceId()})});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error||!body.valid){
+      clearAgentSession();
+      applyRoleMode();
+    }else if(body.agent){
+      localStorage.setItem(AGENT_SESSION_KEY+"-"+getAgentSlug(),JSON.stringify(body.agent));
+      applyAgentBrandingToData();
+    }
+  }catch(e){}
+}
+
 
 
 
@@ -532,4 +629,124 @@ async function deleteEmployee(id){
   try{await employeeApi({action:"delete",id});alert("已删除");loadEmployees()}catch(err){alert(err.message||String(err))}
 }
 
-function refreshAll(){renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();$("sideLogo").src=data.settings.brandLogo}function init(){applyCloudConfigFromUrl();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","roomSelect","weeksSelect","startDateSelect","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=employeeLogin;if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=employeeLogout;verifyEmployeeSession();applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{const btn=$("downloadImage");try{btn.disabled=true;const old=btn.textContent;btn.textContent="正在生成图片...";await downloadImage();btn.textContent=old}catch(e){alert("生成图片失败："+(e.message||e))}finally{btn.disabled=false}};$("printPdf").onclick=()=>window.print();$("addSchool").onclick=async()=>{try{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveLocalOnly();refreshAll();activateTab("schools");scheduleCloudSave();setTimeout(()=>{const el=$("schoolName");if(el){el.focus();el.select&&el.select()}},50)}catch(err){alert("新增学校失败："+(err.message||err))}};$("backupBtn").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="超能游学报价系统数据备份.json";a.click()};$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{data=normalize(JSON.parse(r.result));saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){localStorage.removeItem(STORAGE_KEY);data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData()}init();
+
+
+function setupLoginOverlayText(){
+  if(!isAgentMode()) return;
+  const card=document.querySelector(".login-card");
+  if(!card) return;
+  const p=card.querySelector("p"); if(p) p.textContent="中介白标授权登录 · 单设备绑定";
+  const input=$("employeeCodeInput"); if(input) input.placeholder="请输入中介授权码";
+  const btn=$("employeeLoginBtn"); if(btn) btn.textContent="中介授权登录";
+  const adminBtn=$("employeeAdminLoginBtn"); if(adminBtn) adminBtn.style.display="none";
+  const tip=card.querySelector(".login-tip"); if(tip) tip.textContent="该链接为中介专属入口。首次登录会绑定当前设备，转发给别人无法在其他设备使用。";
+}
+
+function randomAgentCode(){
+  return "AG-" + Math.random().toString(36).slice(2,6).toUpperCase() + "-" + Math.random().toString(36).slice(2,6).toUpperCase();
+}
+function slugify(v){
+  return String(v||"").trim().toLowerCase().replace(/[^a-z0-9-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40);
+}
+let pendingAgentLogo="";
+async function agentApi(payload){
+  const res=await fetch("/api/agents",{method:"POST",headers:{"Content-Type":"application/json","x-admin-password":getAdminPasswordForApi()},body:JSON.stringify(payload||{})});
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok||body.error) throw new Error(body.error||"中介接口失败");
+  return body;
+}
+async function loadAgents(){
+  if(!isAdminMode() || !$("agentManager")) return;
+  try{
+    const res=await fetch("/api/agents",{headers:{"x-admin-password":getAdminPasswordForApi()}});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok||body.error) throw new Error(body.error||"读取失败");
+    renderAgentManager(body.agents||[]);
+  }catch(err){
+    $("agentManager").innerHTML=`<div class="cloud-status bad">中介列表读取失败：${html(err.message||err)}</div>`;
+  }
+}
+function agentLink(slug){
+  const u=new URL(location.href);
+  u.search="";
+  u.hash="";
+  u.searchParams.set("agent",slug);
+  return u.toString();
+}
+function renderAgentManager(list=[]){
+  if(!$("agentManager")) return;
+  $("agentManager").innerHTML=`<div class="sub-box"><h3>新增 / 更新中介白标</h3>
+  <div class="editor-grid">
+    ${field("中介编号 slug","agentSlug","","text","例如：abc-study，只能英文/数字/横杠")}
+    ${field("中介名称","agentName","","text","例如：某某游学")}
+    ${field("报价单品牌名","agentBrand","","text","显示在报价单抬头")}
+    ${field("英文名","agentBrandEn","","text","例如：ABC STUDY")}
+    ${field("水印文字","agentWatermark","","text","例如：某某游学")}
+    ${field("授权码","agentCode",randomAgentCode(),"text","发给中介登录")}
+    ${field("可绑定设备数","agentMaxDevices",1,"number","默认1台设备")}
+    ${field("到期日期","agentExpires","","date","不填则长期有效")}
+  </div>
+  <label>上传中介 Logo<input type="file" id="agentLogoUpload" accept="image/*"/></label>
+  <div class="btn-row"><button onclick="createAgent()">保存中介授权</button><button class="secondary" onclick="$('agentCode').value=randomAgentCode()">生成新授权码</button></div>
+  <p class="muted">学校数据仍然统一读取你的总后台。中介只能自动报价，不能修改学校数据。</p></div>
+  <h3>中介列表</h3>
+  <table class="agent-table"><thead><tr><th>品牌</th><th>专属链接</th><th>授权</th><th>状态</th><th>操作</th></tr></thead><tbody>${list.map(a=>`<tr>
+    <td>${a.logo_data?`<img class="agent-logo-preview" src="${a.logo_data}"/>`:""}<br/><b>${html(a.brand_name||a.name)}</b><br/><small>${html(a.slug||a.id)}</small></td>
+    <td><div class="copy-link-box">${html(agentLink(a.slug||a.id))}</div></td>
+    <td><span class="employee-code">${html(a.login_code||"")}</span><br/><small>设备：${html(a.device_count||0)} / ${html(a.max_devices||1)}</small><br/><small>到期：${html(a.expires_at||"长期")}</small></td>
+    <td>${a.is_active?'<span class="badge-ok">启用</span>':'<span class="badge-bad">停用</span>'}</td>
+    <td><button class="secondary" onclick="copyAgentLink('${a.slug||a.id}')">复制链接</button><button class="secondary" onclick="prefillAgent('${a.slug||a.id}')">编辑</button><button class="secondary" onclick="resetAgentDevices('${a.id}')">重置设备</button><button class="secondary" onclick="toggleAgent('${a.id}',${!a.is_active})">${a.is_active?'停用':'启用'}</button><button class="danger" onclick="deleteAgent('${a.id}')">删除</button></td>
+  </tr>`).join("")}</tbody></table>`;
+  const up=$("agentLogoUpload");
+  if(up) up.onchange=e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const r=new FileReader();
+    r.onload=()=>{pendingAgentLogo=r.result;alert("Logo已读取，点击“保存中介授权”生效")};
+    r.readAsDataURL(file);
+  };
+  window.__agentList=list;
+}
+function prefillAgent(slug){
+  const a=(window.__agentList||[]).find(x=>(x.slug||x.id)===slug);
+  if(!a) return;
+  $("agentSlug").value=a.slug||a.id;
+  $("agentName").value=a.name||"";
+  $("agentBrand").value=a.brand_name||"";
+  $("agentBrandEn").value=a.brand_en||"";
+  $("agentWatermark").value=a.watermark_text||"";
+  $("agentCode").value=a.login_code||"";
+  $("agentMaxDevices").value=a.max_devices||1;
+  $("agentExpires").value=a.expires_at||"";
+  pendingAgentLogo=a.logo_data||"";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+async function createAgent(){
+  try{
+    let slug=slugify($("agentSlug").value || $("agentName").value);
+    if(!slug) return alert("请填写中介编号 slug");
+    const payload={action:"create",slug,name:$("agentName").value.trim(),brandName:$("agentBrand").value.trim(),brandEn:$("agentBrandEn").value.trim(),watermarkText:$("agentWatermark").value.trim(),code:$("agentCode").value.trim(),maxDevices:num($("agentMaxDevices").value)||1,expiresAt:$("agentExpires").value||null,logoData:pendingAgentLogo};
+    if(!payload.name || !payload.code) return alert("请填写中介名称和授权码");
+    await agentApi(payload);
+    alert("已保存中介授权");
+    pendingAgentLogo="";
+    loadAgents();
+  }catch(err){alert(err.message||String(err))}
+}
+async function copyAgentLink(slug){
+  await navigator.clipboard.writeText(agentLink(slug));
+  alert("已复制中介专属链接");
+}
+async function resetAgentDevices(id){
+  if(!confirm("确定重置该中介绑定设备？重置后可用新设备重新登录。")) return;
+  try{await agentApi({action:"resetDevices",id});alert("已重置设备");loadAgents()}catch(err){alert(err.message||String(err))}
+}
+async function toggleAgent(id,active){
+  try{await agentApi({action:"setActive",id,active});alert("已更新状态");loadAgents()}catch(err){alert(err.message||String(err))}
+}
+async function deleteAgent(id){
+  if(!confirm("确定删除这个中介授权？")) return;
+  try{await agentApi({action:"delete",id});alert("已删除");loadAgents()}catch(err){alert(err.message||String(err))}
+}
+
+
+function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","roomSelect","weeksSelect","startDateSelect","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{const btn=$("downloadImage");try{btn.disabled=true;const old=btn.textContent;btn.textContent="正在生成图片...";await downloadImage();btn.textContent=old}catch(e){alert("生成图片失败："+(e.message||e))}finally{btn.disabled=false}};$("printPdf").onclick=()=>window.print();$("addSchool").onclick=async()=>{try{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveLocalOnly();refreshAll();activateTab("schools");scheduleCloudSave();setTimeout(()=>{const el=$("schoolName");if(el){el.focus();el.select&&el.select()}},50)}catch(err){alert("新增学校失败："+(err.message||err))}};$("backupBtn").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="超能游学报价系统数据备份.json";a.click()};$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{data=normalize(JSON.parse(r.result));saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){localStorage.removeItem(currentStorageKey());data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData()}init();

@@ -193,3 +193,41 @@
   font-size: 12px;
   font-weight: 900;
 }
+
+
+/* V9 多中介白标授权 */
+.agent-mode .agent-hide,
+.employee-mode .agent-hide {
+  display: none !important;
+}
+.agent-mode .admin-only {
+  display: none !important;
+}
+.agent-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+}
+.agent-table th,
+.agent-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+.agent-logo-preview {
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  object-fit: contain;
+  background: #fff;
+}
+.copy-link-box {
+  word-break: break-all;
+  font-size: 12px;
+  background: #f5f7ff;
+  border-radius: 10px;
+  padding: 8px;
+  color: #0639a6;
+}

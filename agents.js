@@ -109,62 +109,67 @@ async function agentValid(req){
 function maskKey(key){return !key?"":(key.slice(0,8)+"..."+key.slice(-6))}
 function makeId(prefix){return prefix+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8)}
 
-module.exports = async function handler(req, res) {
-  try {
-    const debug = req.url && req.url.includes("debug=1");
-    if (debug) {
-      let result = {
-        ok: false,
-        env: {
-          SUPABASE_URL_present: !!SUPABASE_URL,
-          SUPABASE_URL_value: SUPABASE_URL || null,
-          SUPABASE_KEY_present: !!SUPABASE_KEY,
-          SUPABASE_KEY_masked: maskKey(SUPABASE_KEY),
-          SUPABASE_TABLE: DATA_TABLE,
-          SUPABASE_ROW: DATA_ROW,
-          node: process.version
-        }
-      };
-      try {
-        const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
-        const r = await sbRequest("GET", path);
-        result.ok = r.ok;
-        result.supabase_status = r.status;
-        result.supabase_response_preview = r.text.slice(0,500);
-      } catch(err) {
-        result.error = err.message || String(err);
-        result.code = err.code || null;
+module.exports = async function handler(req,res){
+  try{
+    if(!isAdmin(req)) return json(res,403,{error:"管理员权限不足：请重新管理员登录"});
+    if(req.method==="GET"){
+      const r=await sbRequest("GET",`/rest/v1/${encodeURIComponent(AGENT_TABLE)}?select=*&order=created_at.desc`);
+      if(!r.ok) return json(res,r.status,{error:r.text});
+      const agents=JSON.parse(r.text||"[]");
+      for(const a of agents){
+        const d=await sbRequest("GET",`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?agent_id=eq.${encodeURIComponent(a.id)}&select=device_id`).catch(()=>({ok:false,text:"[]"}));
+        a.device_count=d.ok?JSON.parse(d.text||"[]").length:0;
       }
-      return json(res,200,result);
+      return json(res,200,{agents});
     }
-
-    const admin = isAdmin(req);
-    const empOk = await employeeValid(req).catch(()=>false);
-    const agOk = await agentValid(req).catch(()=>false);
-
-    if (req.method === "GET") {
-      if(!admin && !empOk && !agOk) return json(res, 401, {error:"未授权，请先登录员工/中介或管理员"});
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
-      const r = await sbRequest("GET", path);
-      if(!r.ok) return json(res,r.status,{error:r.text});
-      const rows=JSON.parse(r.text||"[]");
-      return json(res,200,rows[0]||{});
+    if(req.method==="POST"){
+      const raw=await readBody(req);
+      const body=raw?JSON.parse(raw):{};
+      const action=body.action;
+      if(action==="create"){
+        const slug=String(body.slug||"").trim().toLowerCase();
+        const name=String(body.name||"").trim();
+        const code=String(body.code||"").trim();
+        if(!slug||!name||!code) return json(res,400,{error:"缺少中介编号、名称或授权码"});
+        const payload={
+          id:slug,
+          slug,
+          name,
+          brand_name:String(body.brandName||name).trim(),
+          brand_en:String(body.brandEn||"").trim(),
+          watermark_text:String(body.watermarkText||name).trim(),
+          logo_data:body.logoData||null,
+          login_code:code,
+          max_devices:Math.max(1,Number(body.maxDevices||1)),
+          expires_at:body.expiresAt||null,
+          is_active:true,
+          updated_at:new Date().toISOString(),
+          created_at:new Date().toISOString()
+        };
+        const r=await sbRequest("POST",`/rest/v1/${encodeURIComponent(AGENT_TABLE)}?on_conflict=id`,payload);
+        if(!r.ok) return json(res,r.status,{error:r.text});
+        return json(res,200,{ok:true});
+      }
+      if(action==="resetDevices"){
+        const r=await sbRequest("DELETE",`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?agent_id=eq.${encodeURIComponent(body.id)}`);
+        if(!r.ok) return json(res,r.status,{error:r.text});
+        return json(res,200,{ok:true});
+      }
+      if(action==="setActive"){
+        const r=await sbRequest("PATCH",`/rest/v1/${encodeURIComponent(AGENT_TABLE)}?id=eq.${encodeURIComponent(body.id)}`,{is_active:!!body.active,updated_at:new Date().toISOString()});
+        if(!r.ok) return json(res,r.status,{error:r.text});
+        return json(res,200,{ok:true});
+      }
+      if(action==="delete"){
+        await sbRequest("DELETE",`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?agent_id=eq.${encodeURIComponent(body.id)}`).catch(()=>{});
+        const r=await sbRequest("DELETE",`/rest/v1/${encodeURIComponent(AGENT_TABLE)}?id=eq.${encodeURIComponent(body.id)}`);
+        if(!r.ok) return json(res,r.status,{error:r.text});
+        return json(res,200,{ok:true});
+      }
+      return json(res,400,{error:"未知操作"});
     }
-
-    if (req.method === "POST") {
-      if(!admin) return json(res, 403, {error:"只有管理员可以上传修改数据"});
-      const raw = await readBody(req);
-      const body = raw ? JSON.parse(raw) : {};
-      if(!body.payload) return json(res,400,{error:"缺少 payload"});
-      const payload={id:DATA_ROW,payload:body.payload,updated_at:new Date().toISOString()};
-      const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?on_conflict=id`;
-      const r = await sbRequest("POST", path, payload);
-      if(!r.ok) return json(res,r.status,{error:r.text});
-      return json(res,200,{ok:true});
-    }
-
     return json(res,405,{error:"Method not allowed"});
-  } catch(err) {
+  }catch(err){
     return json(res,500,{error:err.message||String(err),code:err.code||null});
   }
 };

@@ -1,4 +1,4 @@
--- 超能游学报价系统 V8 Supabase 建表 SQL
+-- 超能游学报价系统 V9 多中介白标授权版 Supabase 建表 SQL
 -- Supabase → SQL Editor → New query → 粘贴全部运行
 
 create table if not exists public.super_study_data (
@@ -18,6 +18,32 @@ create table if not exists public.super_study_employees (
   last_login_at timestamptz
 );
 
--- V8 通过 Vercel API 访问 Supabase，密钥只放在 Vercel 环境变量。
+create table if not exists public.super_study_agents (
+  id text primary key,
+  slug text unique not null,
+  name text not null,
+  brand_name text,
+  brand_en text,
+  watermark_text text,
+  logo_data text,
+  login_code text not null,
+  max_devices integer default 1,
+  expires_at date,
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists public.super_study_agent_devices (
+  agent_id text not null,
+  device_id text not null,
+  device_name text,
+  created_at timestamptz default now(),
+  last_login_at timestamptz default now(),
+  primary key (agent_id, device_id)
+);
+
 alter table public.super_study_data disable row level security;
 alter table public.super_study_employees disable row level security;
+alter table public.super_study_agents disable row level security;
+alter table public.super_study_agent_devices disable row level security;

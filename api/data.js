@@ -11,6 +11,8 @@ const SUPABASE_KEY = (
 const DATA_TABLE = process.env.SUPABASE_TABLE || "super_study_data";
 const DATA_ROW = process.env.SUPABASE_ROW || "main";
 const EMP_TABLE = process.env.SUPABASE_EMPLOYEE_TABLE || "super_study_employees";
+const AGENT_TABLE = process.env.SUPABASE_AGENT_TABLE || "super_study_agents";
+const AGENT_DEVICE_TABLE = process.env.SUPABASE_AGENT_DEVICE_TABLE || "super_study_agent_devices";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SuperStudy888";
 
 function json(res, status, body) {
@@ -80,7 +82,32 @@ async function employeeValid(req){
   const e=await getEmployee(id);
   return !!(e && e.is_active && e.bound_device_id === device);
 }
+async function getAgent(id){
+  const path=`/rest/v1/${encodeURIComponent(AGENT_TABLE)}?id=eq.${encodeURIComponent(id)}&select=*`;
+  const r=await sbRequest("GET",path);
+  if(!r.ok) throw new Error(r.text);
+  return (JSON.parse(r.text||"[]"))[0] || null;
+}
+function agentSafe(a){
+  if(!a) return null;
+  return {id:a.id,slug:a.slug||a.id,name:a.name,brandName:a.brand_name,brandEn:a.brand_en,watermarkText:a.watermark_text,brandLogo:a.logo_data};
+}
+function notExpired(a){
+  return !a.expires_at || String(a.expires_at).slice(0,10) >= new Date().toISOString().slice(0,10);
+}
+async function agentValid(req){
+  const id=req.headers["x-agent-id"];
+  const device=req.headers["x-device-id"];
+  if(!id||!device) return false;
+  const a=await getAgent(id);
+  if(!a || !a.is_active || !notExpired(a)) return false;
+  const p=`/rest/v1/${encodeURIComponent(AGENT_DEVICE_TABLE)}?agent_id=eq.${encodeURIComponent(id)}&device_id=eq.${encodeURIComponent(device)}&select=*`;
+  const r=await sbRequest("GET",p);
+  if(!r.ok) return false;
+  return (JSON.parse(r.text||"[]")).length>0;
+}
 function maskKey(key){return !key?"":(key.slice(0,8)+"..."+key.slice(-6))}
+function makeId(prefix){return prefix+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8)}
 
 module.exports = async function handler(req, res) {
   try {
@@ -113,9 +140,10 @@ module.exports = async function handler(req, res) {
 
     const admin = isAdmin(req);
     const empOk = await employeeValid(req).catch(()=>false);
+    const agOk = await agentValid(req).catch(()=>false);
 
     if (req.method === "GET") {
-      if(!admin && !empOk) return json(res, 401, {error:"未授权，请先登录员工或管理员"});
+      if(!admin && !empOk && !agOk) return json(res, 401, {error:"未授权，请先登录员工/中介或管理员"});
       const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
       const r = await sbRequest("GET", path);
       if(!r.ok) return json(res,r.status,{error:r.text});
