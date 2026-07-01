@@ -231,3 +231,83 @@
   padding: 8px;
   color: #0639a6;
 }
+
+
+/* V9.1 报价单图片预览下载层 */
+.image-preview-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 18, 45, .72);
+  padding: 16px;
+}
+.image-preview-modal.show {
+  display: flex;
+}
+.image-preview-card {
+  width: min(920px, 100%);
+  max-height: 94vh;
+  background: #fff;
+  border-radius: 22px;
+  box-shadow: 0 20px 80px rgba(0,0,0,.28);
+  padding: 16px;
+  overflow: hidden;
+}
+.image-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.image-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: #0639a6;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 900;
+}
+.image-preview-scroll {
+  max-height: 72vh;
+  overflow: auto;
+  background: #f3f6fb;
+  border-radius: 14px;
+  padding: 10px;
+  text-align: center;
+}
+.image-preview-scroll img {
+  width: min(100%, 720px);
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  background: #fff;
+}
+@media (max-width: 720px) {
+  .image-preview-card {
+    max-height: 96vh;
+    border-radius: 18px;
+    padding: 12px;
+  }
+  .image-preview-scroll {
+    max-height: 70vh;
+    padding: 6px;
+  }
+  .button-link,
+  .image-preview-actions button {
+    width: 100%;
+  }
+}
