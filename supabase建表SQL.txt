@@ -25,6 +25,10 @@ create table if not exists public.super_study_agents (
   brand_name text,
   brand_en text,
   watermark_text text,
+  quote_slogan text,
+  discount_label text,
+  waiver_label text,
+  discount_remark text,
   logo_data text,
   login_code text not null,
   max_devices integer default 1,
@@ -47,3 +51,10 @@ alter table public.super_study_data disable row level security;
 alter table public.super_study_employees disable row level security;
 alter table public.super_study_agents disable row level security;
 alter table public.super_study_agent_devices disable row level security;
+
+-- V9.2 新增字段：已存在旧表时也会自动补齐
+alter table public.super_study_agents add column if not exists quote_slogan text;
+alter table public.super_study_agents add column if not exists discount_label text;
+alter table public.super_study_agents add column if not exists waiver_label text;
+alter table public.super_study_agents add column if not exists discount_remark text;
+

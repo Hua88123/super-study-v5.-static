@@ -90,7 +90,7 @@ async function getAgent(id){
 }
 function agentSafe(a){
   if(!a) return null;
-  return {id:a.id,slug:a.slug||a.id,name:a.name,brandName:a.brand_name,brandEn:a.brand_en,watermarkText:a.watermark_text,brandLogo:a.logo_data};
+  return {id:a.id,slug:a.slug||a.id,name:a.name,brandName:a.brand_name,brandEn:a.brand_en,watermarkText:a.watermark_text,quoteSlogan:a.quote_slogan,discountLabel:a.discount_label,waiverLabel:a.waiver_label,discountRemark:a.discount_remark,brandLogo:a.logo_data};
 }
 function notExpired(a){
   return !a.expires_at || String(a.expires_at).slice(0,10) >= new Date().toISOString().slice(0,10);

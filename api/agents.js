@@ -90,7 +90,7 @@ async function getAgent(id){
 }
 function agentSafe(a){
   if(!a) return null;
-  return {id:a.id,slug:a.slug||a.id,name:a.name,brandName:a.brand_name,brandEn:a.brand_en,watermarkText:a.watermark_text,brandLogo:a.logo_data};
+  return {id:a.id,slug:a.slug||a.id,name:a.name,brandName:a.brand_name,brandEn:a.brand_en,watermarkText:a.watermark_text,quoteSlogan:a.quote_slogan,discountLabel:a.discount_label,waiverLabel:a.waiver_label,discountRemark:a.discount_remark,brandLogo:a.logo_data};
 }
 function notExpired(a){
   return !a.expires_at || String(a.expires_at).slice(0,10) >= new Date().toISOString().slice(0,10);
@@ -138,6 +138,10 @@ module.exports = async function handler(req,res){
           brand_name:String(body.brandName||name).trim(),
           brand_en:String(body.brandEn||"").trim(),
           watermark_text:String(body.watermarkText||name).trim(),
+          quote_slogan:String(body.quoteSlogan||`${body.brandName||name} · 透明报价 · 安心之选`).trim(),
+          discount_label:String(body.discountLabel||`${body.brandName||name}优惠`).trim(),
+          waiver_label:String(body.waiverLabel||"减免注册金").trim(),
+          discount_remark:String(body.discountRemark||`${body.brandName||name}优惠`).trim(),
           logo_data:body.logoData||null,
           login_code:code,
           max_devices:Math.max(1,Number(body.maxDevices||1)),
