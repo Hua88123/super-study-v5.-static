@@ -129,7 +129,10 @@ function peakWeeksForStay(startDate,weeks,d){
   if(!periods.length)return 0;
   let count=0;
   for(let i=0;i<weeks;i++){
-    let ws=dateAddDays(st,i*7),we=dateAddDays(ws,6);
+    // 周日入学当天不算就读旺季周数；从入学后一天周一开始算，到周六结束。
+    // 例如 7/19 周日入学，8周，旺季到 8/30 周日结束：
+    // 第7周实际就读日是 8/31-9/5，不覆盖旺季，所以不计旺季。
+    let ws=dateAddDays(st,i*7+1),we=dateAddDays(st,i*7+6);
     let hit=periods.some(p=>ws<=p.e&&we>=p.s);
     if(hit)count++;
   }
