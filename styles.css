@@ -311,3 +311,21 @@
     width: 100%;
   }
 }
+
+
+/* V10.1 多课程 / 多宿舍 */
+.multi-options {
+  display: none;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: #f8fbff;
+}
+.multi-options.show {
+  display: block;
+}
+.multi-options h3 {
+  margin: 0 0 6px;
+  color: #0639a6;
+}
