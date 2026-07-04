@@ -183,13 +183,25 @@ function splitWeeks(prefix,total){
   if($(`${prefix}Weeks2`)) $(`${prefix}Weeks2`).value=w2;
   return [w1,w2];
 }
+function fillWeekSelect(id,total,def){
+  let el=$(id);
+  if(!el) return;
+  const old=el.value;
+  el.innerHTML=Array.from({length:Math.max(24,total)+1},(_,i)=>`<option value="${i}">${i}周</option>`).join("");
+  if(old!=="") el.value=old;
+  else el.value=String(def||0);
+}
 function updateMultiModeUI(){
   let box=$("multiOptions");
   if(box) box.classList.toggle("show",isMultiMode());
   let total=num($("weeksSelect")?.value||4);
+  fillWeekSelect("courseWeeks1",total,total);
+  fillWeekSelect("courseWeeks2",total,0);
+  fillWeekSelect("roomWeeks1",total,total);
+  fillWeekSelect("roomWeeks2",total,0);
   if(isMultiMode()){
-    if($("courseWeeks1") && !$("courseWeeks1").value) $("courseWeeks1").value=total;
-    if($("roomWeeks1") && !$("roomWeeks1").value) $("roomWeeks1").value=total;
+    if($("courseWeeks1") && num($("courseWeeks1").value)===0 && num($("courseWeeks2").value)===0) $("courseWeeks1").value=String(total);
+    if($("roomWeeks1") && num($("roomWeeks1").value)===0 && num($("roomWeeks2").value)===0) $("roomWeeks1").value=String(total);
   }
 }
 function buildSelectionDetails(primary,secondary,w1,w2,kind){
