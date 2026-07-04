@@ -2,7 +2,7 @@ const STORAGE_KEY="super-study-static-v5";
 const CLOUD_CONFIG_KEY="super-study-cloud-config-v6";
 const feeTemplate=[["SSP特别学习许可",12000,false],["SSPI-Card",4000,false],["签证延期 Visa Extension",7500,false],["ACR I-Card（超过59天必须办理）",3500,false],["预估教材费 Books",2500,false],["水电费 Utilities",800,true],["设施管理 Maintenance",500,true],["学生证 Student ID",300,false],["接机费 Airport Pick-up",1200,false],["宿舍押金 Dorm Deposit",5000,false]];
 const defaultData={settings:{brandName:"超能游学",brandEn:"SUPER STUDY ABROAD",brandLogo:"./public/superstudy-logo.png",usdRate:7.2,pesoRate:.13,watermarkEnabled:true,watermarkText:"超能游学",quoteSlogan:"超能游学 · 透明报价 · 安心之选",agencyDiscountLabel:"超能折扣",agencyWaiverLabel:"超能减免注册金",agencyDiscountRemark:"超能优惠",agencyAdvantageTitle:"超能游学优势",agencyAdvantageLine1:"全程协助报名、签证、入学",agencyAdvantageLine2:"透明报价，售后跟进更安心",adminPassword:"SuperStudy888"},schools:[{id:"cg-banilad",name:"CG",campus:"Banilad校区",courses:[{id:"esl",name:"ESL加强课",price4w:750,note:"",lessonText:"1对1 5节，团课1节，选修课 2节"},{id:"ielts",name:"IELTS基础课",price4w:850,note:"雅思基础强化",lessonText:"1对1 4节，团课2节，选修课2节"}],rooms:[{id:"hotel",name:"校外酒店",price4w:1500},{id:"triple",name:"3人间宿舍",price4w:700},{id:"quad",name:"4人间宿舍",price4w:650}],discounts:{registrationFee:100,lowSeasonDiscountPer4w:150,lowSeasonDiscountPer1w:0,lowSeasonDiscountMode:"per4",schoolLowSeasonDiscountRate:1,peakFeePerWeek:40,peakPeriods:[{start:"2026-07-05",end:"2026-08-30"},{start:"",end:""}],peakAllowLowSeasonDiscount:false,peakAllowSchoolRateDiscount:false,peakAllowLongDiscount:false,peakAllowAgencyDiscount:false,peakAllowRegistrationWaiver:false,peakRestoreDiscountsEnabled:false,agencyDiscountRate:.9,registrationWaiverAmount:100,long8:0,long12:50,long16:100,long20:150,long24:200,schoolPromoTitle:"学校优惠",schoolPromoText:"淡季每4周减免，可叠加长期优惠，具体以学校最新政策为准。",lowSeasonEnabled:true,schoolLowSeasonRateEnabled:false,peakSeasonEnabled:false,longDiscountEnabled:true,agencyDiscountEnabled:true,registrationWaiverEnabled:false},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}}],records:[]};
-let data=loadData();let selectedSchoolId=data.schools[0].id;let editingSchoolId=selectedSchoolId;
+let data=loadData();let selectedSchoolId=data.schools[0].id;let editingSchoolId=selectedSchoolId;let lastChangedMultiWeek="";
 function $(id){return document.getElementById(id)}function clone(o){return JSON.parse(JSON.stringify(o))}function loadData(){try{let r=localStorage.getItem(currentStorageKey());if(r)return normalize(JSON.parse(r))}catch(e){}return clone(defaultData)}let cloudSaveTimer=null;
 function getCloudConfig(){
   return {enabled:true};
@@ -170,17 +170,34 @@ function optionText(list,id){
 function splitWeeks(prefix,total){
   total=Math.max(0,num(total));
   if(!isMultiMode()) return [total,0];
-  let w1=num($(`${prefix}Weeks1`)?.value),w2=num($(`${prefix}Weeks2`)?.value);
+  let el1=$(`${prefix}Weeks1`),el2=$(`${prefix}Weeks2`);
+  let w1=num(el1?.value),w2=num(el2?.value);
+
   if(w1<=0&&w2<=0){w1=total;w2=0;}
+
+  // 如果两段相加超过总周数，保留用户最后选择的那个字段，自动调整另一段。
+  // 例如总周数8，课程1原来是8，用户选择课程2为4：
+  // 系统自动把课程1改成4，而不是把课程2改回0。
   if(w1+w2>total){
-    if(w1>=total){w1=total;w2=0;}
-    else{w2=total-w1;}
+    if(lastChangedMultiWeek===`${prefix}Weeks1`){
+      w1=Math.min(w1,total);
+      w2=Math.max(0,total-w1);
+    }else if(lastChangedMultiWeek===`${prefix}Weeks2`){
+      w2=Math.min(w2,total);
+      w1=Math.max(0,total-w2);
+    }else{
+      w2=Math.min(w2,total);
+      w1=Math.max(0,total-w2);
+    }
   }
+
+  // 如果两段不足总周数，剩余周数补到第1项，避免漏算。
   if(w1+w2<total){
     w1+=total-w1-w2;
   }
-  if($(`${prefix}Weeks1`)) $(`${prefix}Weeks1`).value=w1;
-  if($(`${prefix}Weeks2`)) $(`${prefix}Weeks2`).value=w2;
+
+  if(el1) el1.value=String(w1);
+  if(el2) el2.value=String(w2);
   return [w1,w2];
 }
 function fillWeekSelect(id,total,def){
@@ -987,7 +1004,7 @@ async function deleteAgent(id){
 }
 
 
-function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
+function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(["courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2"].includes(id)){lastChangedMultiWeek=id}if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){lastChangedMultiWeek="";updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
   const btn=$("downloadImage");
   const old=btn.textContent;
   try{
