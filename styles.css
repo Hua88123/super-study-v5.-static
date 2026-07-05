@@ -977,3 +977,11 @@ th,td{padding:5px 5px !important; line-height:1.25 !important; vertical-align:to
     content:"";
   }
 }
+
+
+/* V15 手机端可下载小JPG，不改报价图模板 */
+@media (max-width:720px){
+  #downloadImage{
+    background:linear-gradient(135deg,#e4251a,#ff7a18);
+  }
+}

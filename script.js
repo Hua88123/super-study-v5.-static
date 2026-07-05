@@ -818,6 +818,90 @@ async function captureQuoteDomCanvas(){
 }
 
 
+
+function submitMobileImage(dataUrl, filename){
+  const form=document.createElement("form");
+  form.method="POST";
+  form.action="/api/mobile-image-download";
+  form.target="_self";
+  form.enctype="application/x-www-form-urlencoded";
+  form.style.display="none";
+
+  const i1=document.createElement("input");
+  i1.type="hidden";
+  i1.name="dataUrl";
+  i1.value=dataUrl;
+
+  const i2=document.createElement("input");
+  i2.type="hidden";
+  i2.name="filename";
+  i2.value=filename || "quote-mobile.jpg";
+
+  form.appendChild(i1);
+  form.appendChild(i2);
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function resizeCanvasToWidth(srcCanvas, targetWidth){
+  const ratio=targetWidth/srcCanvas.width;
+  const targetHeight=Math.max(1,Math.round(srcCanvas.height*ratio));
+  const out=document.createElement("canvas");
+  out.width=targetWidth;
+  out.height=targetHeight;
+  const ctx=out.getContext("2d");
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,out.width,out.height);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  ctx.drawImage(srcCanvas,0,0,out.width,out.height);
+  return out;
+}
+
+function makeMobileJpgDataUrl(srcCanvas){
+  // 手机端专用：宽度压到 720，JPG压缩，避免接口和浏览器限制
+  let w=Math.min(720, srcCanvas.width);
+  let q=0.82;
+  let c=resizeCanvasToWidth(srcCanvas,w);
+  let url=c.toDataURL("image/jpeg",q);
+
+  // 如果还偏大，继续降尺寸/质量，保证能通过手机和Vercel
+  const maxLen=2.2*1024*1024; // base64字符串长度，约1.6MB文件
+  const widths=[680,640,600,560];
+  const qs=[0.78,0.72,0.68,0.62];
+  let wi=0, qi=0;
+  while(url.length>maxLen && (wi<widths.length || qi<qs.length)){
+    if(wi<widths.length){
+      w=widths[wi++];
+      c=resizeCanvasToWidth(srcCanvas,w);
+    }
+    if(qi<qs.length) q=qs[qi++];
+    url=c.toDataURL("image/jpeg",q);
+  }
+  return url;
+}
+
+async function downloadMobileImage(){
+  const c=calc(),s=c.school;
+  const filename=`${s.name}-${s.campus}-${c.weeks}周-手机报价图.jpg`;
+  let canvas=null;
+  try{
+    // 优先使用当前报价单模板截图，保持和电脑端最接近
+    canvas=await captureQuoteSvgCanvas();
+  }catch(err1){
+    console.warn("手机模板截图失败，切换DOM截图：",err1);
+    try{
+      canvas=await captureQuoteDomCanvas();
+    }catch(err2){
+      console.warn("DOM截图失败，切换原生图：",err2);
+      const ret=await drawNativeQuoteCanvas();
+      canvas=ret.canvas;
+    }
+  }
+  const jpg=makeMobileJpgDataUrl(canvas);
+  submitMobileImage(jpg,filename);
+}
+
 function openFinalMobileSavePage(){
   try{
     renderQuoteSheet();
@@ -910,7 +994,7 @@ async function saveCanvasImage(canvas, filename){
     modal.classList.add("show");
 
     if(isMobile){
-      if(tip) tip.textContent="手机最终方案：点击“最终手机保存页”，进入后直接用手机系统截图保存。这不依赖浏览器下载，所以不会再出现下载失败。";
+      if(tip) tip.textContent="手机最终方案：系统会生成压缩后的手机JPG图，打开后长按保存；如果失败再用最终手机保存页截图。";
 
       if(finalBtn){
         finalBtn.style.display="inline-flex";
@@ -1739,7 +1823,11 @@ async function deleteAgent(id){
 function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(["courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2"].includes(id)){lastChangedMultiWeek=id}if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){lastChangedMultiWeek="";updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
   const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
   if(isMobile){
-    openFinalMobileSavePage();
+    const btn=$("downloadImage");
+    const old=btn.textContent;
+    btn.disabled=true;
+    btn.textContent="正在生成手机图片...";
+    try{ await downloadMobileImage(); }catch(err){ alert("生成报价单图片失败："+(err.message||err)); btn.disabled=false; btn.textContent=old; }
     return;
   }
   const btn=$("downloadImage");
