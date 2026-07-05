@@ -731,57 +731,242 @@ async function inlineCloneImages(root){
     }
   }
 }
-async function downloadImage(){
-  let host=null;
-  try{
-    renderQuoteSheet();
-    const c=calc(), s=c.school;
-    const original=$("quoteSheet");
-    if(!original) throw new Error("未找到报价单区域");
-
-    const html2canvas = await ensureHtml2Canvas();
-
-    host=document.createElement("div");
-    host.className="quote-export-host";
-    host.style.cssText="position:absolute;left:-99999px;top:0;width:1080px;background:#fff;z-index:-1;pointer-events:none;opacity:1;";
-    const clone=original.cloneNode(true);
-    clone.id="quoteSheetExport";
-    clone.classList.add("exporting");
-    host.appendChild(clone);
-    document.body.appendChild(host);
-
-    await inlineCloneImages(clone);
-    await waitForExportReady(clone);
-
-    const width=Math.ceil(clone.scrollWidth || 1080);
-    const height=Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 1600);
-
-    // 手机端内存较小，使用较低 scale，避免 canvas 过大导致失败。
-    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const scale=isMobile?1.25:2;
-
-    const canvas = await html2canvas(clone,{
-      backgroundColor:"#ffffff",
-      useCORS:true,
-      allowTaint:true,
-      scale,
-      width,
-      height,
-      windowWidth:1280,
-      windowHeight:Math.max(height,900),
-      scrollX:0,
-      scrollY:0,
-      logging:false,
-      removeContainer:true
+function wrapCanvasText(ctx,text,maxWidth,maxLines=99){
+  const out=[];
+  String(text||"").split("\n").forEach(par=>{
+    let line="";
+    for(const ch of String(par)){
+      const test=line+ch;
+      if(ctx.measureText(test).width>maxWidth && line){
+        out.push(line);
+        line=ch;
+        if(out.length>=maxLines) return;
+      }else{
+        line=test;
+      }
+    }
+    if(line && out.length<maxLines) out.push(line);
+  });
+  return out.slice(0,maxLines);
+}
+function drawWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines=99){
+  const lines=wrapCanvasText(ctx,text,maxWidth,maxLines);
+  lines.forEach((line,i)=>ctx.fillText(line,x,y+i*lineHeight));
+  return lines.length*lineHeight;
+}
+function canvasRoundRect(ctx,x,y,w,h,r,fill,stroke){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+  if(fill) ctx.fill();
+  if(stroke) ctx.stroke();
+}
+function drawNativeWatermark(ctx,W,H,logo,txt){
+  ctx.save();
+  ctx.globalAlpha=.08;
+  ctx.translate(W/2,H/2);
+  ctx.rotate(-Math.PI/6);
+  for(let y=-H*1.2;y<=H*1.2;y+=100){
+    for(let x=-W*1.5;x<=W*1.5;x+=190){
+      if(logo){
+        try{ctx.drawImage(logo,x,y-18,32,32)}catch(e){}
+      }
+      ctx.fillStyle="#0639a6";
+      ctx.font="bold 20px Arial, sans-serif";
+      ctx.fillText(txt,x+38,y+6);
+    }
+  }
+  ctx.restore();
+}
+function rowHeightByText(ctx,row,colWidths){
+  let max=38;
+  row.forEach((cell,i)=>{
+    const lines=wrapCanvasText(ctx,String(cell||""),colWidths[i]-14,3).length||1;
+    max=Math.max(max,18+lines*17);
+  });
+  return max;
+}
+function drawNativeTable(ctx,headers,rows,x,y,w){
+  const col=[w*.22,w*.40,w*.20,w*.18];
+  ctx.font="bold 14px Arial, sans-serif";
+  let h=36, cx=x;
+  ctx.fillStyle="#f5f8ff";ctx.fillRect(x,y,w,h);
+  headers.forEach((head,i)=>{
+    ctx.strokeStyle="#dbe7ff";ctx.strokeRect(cx,y,col[i],h);
+    ctx.fillStyle="#0639a6";ctx.fillText(head,cx+7,y+23);
+    cx+=col[i];
+  });
+  y+=h;
+  rows.forEach((row,ri)=>{
+    ctx.font="14px Arial, sans-serif";
+    const rh=rowHeightByText(ctx,row,col);
+    cx=x;
+    ctx.fillStyle=ri%2?"#fbfdff":"#fff";ctx.fillRect(x,y,w,rh);
+    row.forEach((cell,i)=>{
+      ctx.strokeStyle="#dbe7ff";ctx.strokeRect(cx,y,col[i],rh);
+      ctx.fillStyle=i===2?"#0639a6":"#17214d";
+      ctx.font=i===2?"bold 14px Arial, sans-serif":"14px Arial, sans-serif";
+      const lines=wrapCanvasText(ctx,String(cell||""),col[i]-14,3);
+      lines.forEach((line,li)=>ctx.fillText(line,cx+7,y+20+li*17));
+      cx+=col[i];
     });
+    y+=rh;
+  });
+  return y;
+}
+async function drawNativeQuoteCanvas(){
+  const c=calc(), s=c.school, set=data.settings;
+  const W=1000, margin=28;
+  const logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");
+  const usdRows=buildUsdRows(c,s);
+  const phpRows=c.localItems.map(it=>[
+    it.name.replace("（超过59天必须办理）",""),
+    it.perWeek?`${it.amount} PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),
+    Math.round(it.total??it.amount).toLocaleString(),
+    it.excluded?"不含合计":(it.note||"")
+  ]);
 
-    host.remove();
-    host=null;
+  const temp=document.createElement("canvas").getContext("2d");
+  temp.font="14px Arial, sans-serif";
+  let usdH=36+usdRows.reduce((a,r)=>a+rowHeightByText(temp,r,[455*.22,455*.40,455*.20,455*.18]),0)+70;
+  let phpH=36+phpRows.reduce((a,r)=>a+rowHeightByText(temp,r,[455*.22,455*.40,455*.20,455*.18]),0)+70;
+  let panelH=Math.max(420,usdH,phpH);
 
+  const promoTextLines=Math.max(
+    wrapCanvasText(temp,s.discounts.schoolPromoText,420,10).length,
+    wrapCanvasText(temp,`${set.agencyAdvantageLine1}\n${set.agencyAdvantageLine2}`,420,10).length
+  );
+  const promoH=Math.max(100,54+promoTextLines*18);
+
+  const courseLines=c.courseDetails.reduce((n,d)=>n+1+wrapCanvasText(temp,courseLesson(d.item)||"以学校安排为准",560,5).length,0);
+  const roomLines=c.roomDetails.length || 1;
+  const courseBoxH=Math.max(120,54+courseLines*18);
+  const roomBoxH=Math.max(120,54+roomLines*24);
+  const extraH=Math.max(courseBoxH,roomBoxH);
+
+  const H=190+120+extraH+promoH+panelH+210+110+60;
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const scale=isMobile?1.35:2;
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.round(W*scale);
+  canvas.height=Math.round(H*scale);
+  const ctx=canvas.getContext("2d");
+  ctx.scale(scale,scale);
+
+  ctx.fillStyle="#ffffff";ctx.fillRect(0,0,W,H);
+  drawNativeWatermark(ctx,W,H,logo,set.watermarkText||set.brandName||"超能游学");
+
+  const grad=ctx.createLinearGradient(0,0,W,165);
+  grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.65,"#fff");grad.addColorStop(1,"#fff3c0");
+  ctx.fillStyle=grad;canvasRoundRect(ctx,margin,20,W-margin*2,150,22,true,false);
+  if(logo)ctx.drawImage(logo,margin+18,38,112,112);
+  ctx.fillStyle="#0639a6";ctx.font="bold 42px Arial, sans-serif";
+  drawWrap(ctx,`${s.name} ${s.campus}`,margin+150,68,760,46,1);
+  ctx.font="bold 32px Arial, sans-serif";ctx.fillStyle="#111b63";
+  ctx.fillText(`游学报价单（${c.weeks}周）`,margin+150,114);
+  ctx.fillStyle="#0798e8";canvasRoundRect(ctx,margin+150,128,470,34,17,true,false);
+  ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(quoteSlogan(),margin+176,151);
+
+  function infoCard(x,y,w,h,title,main,sub){
+    ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y,w,h,18,true,true);
+    ctx.fillStyle="#0639a6";ctx.font="bold 18px Arial, sans-serif";ctx.fillText(title,x+14,y+28);
+    ctx.fillStyle="#111b63";ctx.font="bold 17px Arial, sans-serif";drawWrap(ctx,main,x+14,y+55,w-28,20,2);
+    ctx.fillStyle="#667395";ctx.font="13px Arial, sans-serif";drawWrap(ctx,sub,x+14,y+h-38,w-28,16,2);
+  }
+  let y=190;
+  const infoW=(W-margin*2-4*10)/5;
+  [
+    ["学校",s.name,s.campus],
+    ["时间",`${c.weeks}周`,`${c.startDate} 入学｜${c.endDate} 毕业`],
+    ["课程",c.courseName||"-","报名周数下方列明"],
+    ["房型",c.roomName||"-","住宿按所选房型"],
+    ["注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,""]
+  ].forEach((it,i)=>infoCard(margin+i*(infoW+10),y,infoW,106,it[0],it[1],it[2]));
+
+  y+=122;
+  const leftW=610, rightW=W-margin*2-leftW-12;
+  ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,margin,y,leftW,extraH,18,true,true);
+  ctx.fillStyle="#0639a6";ctx.font="bold 20px Arial, sans-serif";ctx.fillText("具体课程课时",margin+16,y+30);
+  let cy=y+58;
+  c.courseDetails.forEach(d=>{
+    ctx.fillStyle="#111b63";ctx.font="bold 16px Arial, sans-serif";
+    ctx.fillText(`${d.item?.name||"-"} ${d.weeks}周`,margin+16,cy);
+    cy+=20;
+    ctx.fillStyle="#44506f";ctx.font="14px Arial, sans-serif";
+    cy+=drawWrap(ctx,courseLesson(d.item)||"以学校安排为准",margin+32,cy,leftW-48,17,5);
+    cy+=6;
+  });
+
+  ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,margin+leftW+12,y,rightW,extraH,18,true,true);
+  ctx.fillStyle="#0639a6";ctx.font="bold 20px Arial, sans-serif";ctx.fillText("住宿安排",margin+leftW+28,y+30);
+  let ry=y+62;
+  c.roomDetails.forEach(d=>{
+    ctx.fillStyle="#111b63";ctx.font="bold 16px Arial, sans-serif";
+    ctx.fillText(`${d.item?.name||"-"} ${d.weeks}周`,margin+leftW+28,ry);
+    ry+=24;
+  });
+  y+=extraH+14;
+
+  ctx.fillStyle="#fff5f5";ctx.strokeStyle="#ffd7d7";canvasRoundRect(ctx,margin,y,leftW,promoH,18,true,true);
+  ctx.fillStyle="#e4251a";ctx.font="bold 20px Arial, sans-serif";ctx.fillText(s.discounts.schoolPromoTitle,margin+16,y+30);
+  ctx.fillStyle="#17214d";ctx.font="15px Arial, sans-serif";
+  drawWrap(ctx,s.discounts.schoolPromoText,margin+16,y+58,leftW-32,18,12);
+
+  ctx.fillStyle="#f7f9ff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,margin+leftW+12,y,rightW,promoH,18,true,true);
+  ctx.fillStyle="#0639a6";ctx.font="bold 20px Arial, sans-serif";ctx.fillText(set.agencyAdvantageTitle,margin+leftW+28,y+30);
+  ctx.fillStyle="#17214d";ctx.font="15px Arial, sans-serif";
+  drawWrap(ctx,`✓ ${set.agencyAdvantageLine1}\n✓ ${set.agencyAdvantageLine2}`,margin+leftW+28,y+58,rightW-32,18,8);
+  y+=promoH+16;
+
+  const panelW=(W-margin*2-14)/2;
+  function drawPanel(x,y,title,green,rows,totalText,totalAmount){
+    ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y,panelW,panelH,20,true,true);
+    ctx.fillStyle=green?"#0b7a48":"#0639a6";canvasRoundRect(ctx,x,y,panelW,50,20,true,false);
+    ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(title,x+16,y+31);
+    let endY=drawNativeTable(ctx,["项目","说明","金额","备注"],rows,x+12,y+62,panelW-24);
+    ctx.fillStyle="#fff";ctx.fillRect(x+12,y+panelH-62,panelW-24,46);
+    ctx.fillStyle=green?"#0b7a48":"#0639a6";ctx.font="bold 22px Arial, sans-serif";ctx.fillText(totalText,x+24,y+panelH-31);
+    ctx.fillStyle=green?"#0b7a48":"#e4251a";ctx.font="bold 26px Arial, sans-serif";ctx.fillText(totalAmount,x+164,y+panelH-31);
+  }
+  drawPanel(margin,y,"费用一：学费 & 住宿费（美元）",false,usdRows,"费用一合计：",`${Math.round(c.totalUsd).toLocaleString()} 美元`);
+  drawPanel(margin+panelW+14,y,"费用二：到校支付费用（披索）",true,phpRows,"费用二合计：",`${Math.round(c.localPeso).toLocaleString()} PHP`);
+  y+=panelH+16;
+
+  ctx.fillStyle="#fbfdff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,margin,y,W-margin*2,200,22,true,true);
+  ctx.fillStyle="#0639a6";ctx.font="bold 28px Arial, sans-serif";ctx.textAlign="center";ctx.fillText("本次游学总计（以实际汇率为准）",W/2,y+42);ctx.textAlign="left";
+  function sumBox(x,title,sub,val,color){
+    ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y+66,250,90,16,true,true);
+    ctx.fillStyle=color;ctx.font="bold 17px Arial, sans-serif";ctx.fillText(title,x+18,y+94);
+    ctx.fillStyle="#17214d";ctx.font="13px Arial, sans-serif";drawWrap(ctx,sub,x+18,y+116,216,15,2);
+    ctx.fillStyle=color;ctx.font="bold 18px Arial, sans-serif";ctx.fillText(val,x+18,y+144);
+  }
+  sumBox(margin+26,"美元部分",`${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}`,rmb(c.tuitionRmb),"#0639a6");
+  ctx.fillStyle="#0639a6";ctx.font="bold 36px Arial, sans-serif";ctx.fillText("+",margin+294,y+125);
+  sumBox(margin+330,"披索部分",`${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}`,rmb(c.localRmb),"#0b7a48");
+  ctx.fillStyle="#0639a6";ctx.font="bold 36px Arial, sans-serif";ctx.fillText("≈",margin+598,y+125);
+  ctx.fillStyle="#e4251a";ctx.font="bold 44px Arial, sans-serif";ctx.fillText(`${Math.round(c.totalRmb).toLocaleString()}`,margin+660,y+120);
+  ctx.font="bold 20px Arial, sans-serif";ctx.fillText("人民币",margin+702,y+150);
+  y+=216;
+
+  ctx.fillStyle="#fff7e8";ctx.strokeStyle="#ffd98c";canvasRoundRect(ctx,margin,y,W-margin*2,84,18,true,true);
+  ctx.fillStyle="#17214d";ctx.font="bold 17px Arial, sans-serif";ctx.fillText(`选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务`,margin+20,y+30);
+  ctx.font="15px Arial, sans-serif";drawWrap(ctx,"备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。",margin+20,y+58,W-margin*2-40,18,2);
+
+  // 最后再盖一遍水印，保证全覆盖且在图片上可见。
+  drawNativeWatermark(ctx,W,H,logo,set.watermarkText||set.brandName||"超能游学");
+
+  return {canvas,c,s};
+}
+async function downloadImage(){
+  try{
+    const {canvas,c,s}=await drawNativeQuoteCanvas();
     await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`);
   }catch(err){
-    if(host) host.remove();
-    alert("生成报价单图片失败："+(err.message||err)+"。手机端建议刷新页面后再点一次。");
+    alert("生成报价单图片失败："+(err.message||err));
   }
 }
 function renderRecords(){$("recordsList").innerHTML=data.records.length?data.records.map((r,i)=>`<div class="list-item"><div><b>${r.title}</b><br/><span class="muted">${r.createdAt}</span></div><div class="list-actions"><button onclick="navigator.clipboard.writeText(data.records[${i}].text)">复制</button><button class="danger" onclick="deleteRecord(${i})">删除</button></div></div>`).join(""):`<p class="muted">暂无报价记录</p>`}function deleteRecord(i){data.records.splice(i,1);saveData();renderRecords()}
