@@ -6,8 +6,6 @@
     "build": "echo static build",
     "start": "echo static system"
   },
-  "dependencies": {
-    "sharp": "^0.33.5"
-  },
+  "dependencies": {},
   "devDependencies": {}
 }

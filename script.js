@@ -2,26 +2,7 @@ const STORAGE_KEY="super-study-static-v5";
 const CLOUD_CONFIG_KEY="super-study-cloud-config-v6";
 const feeTemplate=[["SSP特别学习许可",12000,false],["SSPI-Card",4000,false],["签证延期 Visa Extension",7500,false],["ACR I-Card（超过59天必须办理）",3500,false],["预估教材费 Books",2500,false],["水电费 Utilities",800,true],["设施管理 Maintenance",500,true],["学生证 Student ID",300,false],["接机费 Airport Pick-up",1200,false],["宿舍押金 Dorm Deposit",5000,false]];
 const defaultData={settings:{brandName:"超能游学",brandEn:"SUPER STUDY ABROAD",brandLogo:"./public/superstudy-logo.png",usdRate:7.2,pesoRate:.13,watermarkEnabled:true,watermarkText:"超能游学",quoteSlogan:"超能游学 · 透明报价 · 安心之选",agencyDiscountLabel:"超能折扣",agencyWaiverLabel:"超能减免注册金",agencyDiscountRemark:"超能优惠",agencyAdvantageTitle:"超能游学优势",agencyAdvantageLine1:"全程协助报名、签证、入学",agencyAdvantageLine2:"透明报价，售后跟进更安心",adminPassword:"SuperStudy888"},schools:[{id:"cg-banilad",name:"CG",campus:"Banilad校区",courses:[{id:"esl",name:"ESL加强课",price4w:750,note:"",lessonText:"1对1 5节，团课1节，选修课 2节"},{id:"ielts",name:"IELTS基础课",price4w:850,note:"雅思基础强化",lessonText:"1对1 4节，团课2节，选修课2节"}],rooms:[{id:"hotel",name:"校外酒店",price4w:1500},{id:"triple",name:"3人间宿舍",price4w:700},{id:"quad",name:"4人间宿舍",price4w:650}],discounts:{registrationFee:100,lowSeasonDiscountPer4w:150,lowSeasonDiscountPer1w:0,lowSeasonDiscountMode:"per4",schoolLowSeasonDiscountRate:1,peakFeePerWeek:40,peakPeriods:[{start:"2026-07-05",end:"2026-08-30"},{start:"",end:""}],peakAllowLowSeasonDiscount:false,peakAllowSchoolRateDiscount:false,peakAllowLongDiscount:false,peakAllowAgencyDiscount:false,peakAllowRegistrationWaiver:false,peakRestoreDiscountsEnabled:false,agencyDiscountRate:.9,registrationWaiverAmount:100,long4:0,long8:0,long12:50,long16:100,long20:150,long24:200,schoolPromoTitle:"学校优惠",schoolPromoText:"淡季每4周减免，可叠加长期优惠，具体以学校最新政策为准。",lowSeasonEnabled:true,lowSeasonManualSelectable:false,schoolLowSeasonRateEnabled:false,peakSeasonEnabled:false,longDiscountEnabled:true,agencyDiscountEnabled:true,registrationWaiverEnabled:false},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}}],records:[]};
-let data=loadData();migrateOldLocalDataIfEmpty();let selectedSchoolId=data.schools[0].id;let editingSchoolId=selectedSchoolId;let lastChangedMultiWeek="";let applyingSchoolDefaults=false;
-function migrateOldLocalDataIfEmpty(){
-  try{
-    const keys=["super-study-static-v5","super-study-static-v4","super-study-static-v3","super-study-static","super-study-data"];
-    const current=currentStorageKey();
-    const hasReal=data && data.schools && data.schools.length && !(data.schools.length===1 && data.schools[0].id==="cg-banilad");
-    if(hasReal) return;
-    for(const k of keys){
-      if(k===current) continue;
-      const raw=localStorage.getItem(k);
-      if(!raw) continue;
-      const old=normalize(JSON.parse(raw));
-      if(old && old.schools && old.schools.length>1){
-        data=old;
-        localStorage.setItem(current,JSON.stringify(data));
-        return;
-      }
-    }
-  }catch(e){}
-}
+let data=loadData();let selectedSchoolId=data.schools[0].id;let editingSchoolId=selectedSchoolId;let lastChangedMultiWeek="";let applyingSchoolDefaults=false;
 function $(id){return document.getElementById(id)}function clone(o){return JSON.parse(JSON.stringify(o))}function loadData(){try{let r=localStorage.getItem(currentStorageKey());if(r)return normalize(JSON.parse(r))}catch(e){}return clone(defaultData)}let cloudSaveTimer=null;
 function getCloudConfig(){
   return {enabled:true};
@@ -544,7 +525,6 @@ function buildUsdRows(c,s){
 }
 function renderQuoteSheet(){
   let c=calc(),s=c.school,set=data.settings;
-  const schoolTitle=[s.name,s.campus].filter(Boolean).join("-");
   let usdRows=buildUsdRows(c,s);
   let phpRows=c.localItems.map(it=>[
     it.name,
@@ -560,14 +540,14 @@ function renderQuoteSheet(){
     <div class="sheet-head">
       <img class="sheet-logo" src="${set.brandLogo}"/>
       <div class="sheet-title">
-        <h2>${schoolTitle||s.name}</h2>
+        <h2>${s.name} ${s.campus}</h2>
         <h3>游学报价单（${c.weeks}周）</h3>
         <span class="slogan">${quoteSlogan()}</span>
       </div>
     </div>
     <div class="info-grid">
-      ${info("学校",schoolTitle||s.name,s.campus||"")}
-      ${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜<br>${c.endDate} 周六毕业`)}
+      ${info("学校",s.name,s.campus)}
+      ${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜${c.endDate} 周六毕业`)}
       ${info("课程",c.courseName||"-","报名周数已列明")}
       ${info("房型",c.roomName||"-","住宿按所选房型")}
       ${info("注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,"")}
@@ -664,16 +644,10 @@ function ensureImagePreviewModal(){
       <b>报价单图片已生成</b>
       <button class="secondary" id="imagePreviewClose">关闭</button>
     </div>
-    <p class="muted" id="imagePreviewTip">手机端：先长按下方预览图保存；不行再点“打开大图长按保存”。电脑端：点击“下载图片”。</p>
+    <p class="muted">手机端：长按下方图片保存到相册。电脑端：点击“下载图片”。</p>
     <div class="image-preview-actions">
       <a id="imagePreviewDownload" class="button-link" download="报价单.png">下载图片</a>
-      <button class="secondary" id="imagePreviewShare" style="display:none;">系统分享/保存</button>
-      <button class="secondary" id="imagePreviewCopy" style="display:none;">复制图片</button>
-      <button class="secondary" id="imagePreviewFinal">最终手机保存页</button>
-      <button class="secondary" id="imagePreviewRealPng">打开真实PNG保存</button>
-      <button class="secondary" id="imagePreviewServer">手机保存页</button>
-      <button class="secondary" id="imagePreviewFull">全屏保存模式</button>
-      <button class="secondary" id="imagePreviewOpen">打开大图长按保存</button>
+      <button class="secondary" id="imagePreviewOpen">打开原图</button>
     </div>
     <div class="image-preview-scroll"><img id="imagePreviewImg" alt="报价单图片"/></div>
   </div>`;
@@ -683,487 +657,49 @@ function ensureImagePreviewModal(){
   return modal;
 }
 
-
-function collectPageCssText(){
-  let css="";
-  for(const sheet of Array.from(document.styleSheets)){
-    try{
-      for(const rule of Array.from(sheet.cssRules||[])){
-        css += rule.cssText + "\n";
-      }
-    }catch(e){}
-  }
-  return css;
-}
-function loadImageFromUrl(url){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    img.onload=()=>resolve(img);
-    img.onerror=reject;
-    img.src=url;
-  });
-}
-async function captureQuoteSvgCanvas(){
-  const source=$("quoteSheet");
-  if(!source) throw new Error("未找到报价单区域");
-  const host=document.createElement("div");
-  host.className="quote-export-host";
-  host.style.cssText="position:fixed;left:-20000px;top:0;z-index:-1;padding:0;margin:0;background:#fff;";
-  const clone=source.cloneNode(true);
-  clone.classList.add("exporting");
-  clone.style.margin="0";
-  clone.style.transform="none";
-  host.appendChild(clone);
-  document.body.appendChild(host);
-
-  try{
-    await inlineCloneImages(clone);
-    await waitForExportReady(host);
-    const rect=clone.getBoundingClientRect();
-    const width=Math.ceil(rect.width || clone.scrollWidth || 1000);
-    const height=Math.ceil(rect.height || clone.scrollHeight || 1600);
-
-    const wrapper=document.createElement("div");
-    wrapper.setAttribute("xmlns","http://www.w3.org/1999/xhtml");
-    wrapper.style.margin="0";
-    wrapper.style.padding="0";
-    wrapper.style.background="#fff";
-
-    const style=document.createElement("style");
-    style.textContent=collectPageCssText()+`
-      body{margin:0;background:#fff;}
-      .quote-sheet{margin:0!important;box-shadow:none!important;}
-      .quote-export-host .quote-sheet,.quote-sheet.exporting{width:${width}px!important;max-width:${width}px!important;min-width:${width}px!important;}
-    `;
-    wrapper.appendChild(style);
-    wrapper.appendChild(clone.cloneNode(true));
-
-    const xhtml=new XMLSerializer().serializeToString(wrapper);
-    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <foreignObject x="0" y="0" width="100%" height="100%">${xhtml}</foreignObject>
-    </svg>`;
-    const svgBlob=new Blob([svg],{type:"image/svg+xml;charset=utf-8"});
-    const url=URL.createObjectURL(svgBlob);
-    try{
-      const img=await loadImageFromUrl(url);
-      const canvas=document.createElement("canvas");
-      // 手机端用1倍生成，避免内存爆掉；电脑端也保持模板比例不变。
-      canvas.width=width;
-      canvas.height=height;
-      const ctx=canvas.getContext("2d");
-      ctx.fillStyle="#fff";
-      ctx.fillRect(0,0,width,height);
-      ctx.drawImage(img,0,0,width,height);
-      return trimCanvasWhitespace(canvas,4);
-    }finally{
-      URL.revokeObjectURL(url);
-    }
-  }finally{
-    host.remove();
-  }
-}
-
-function trimCanvasWhitespace(srcCanvas,padding=6){
-  try{
-    const ctx=srcCanvas.getContext("2d",{willReadFrequently:true});
-    const w=srcCanvas.width,h=srcCanvas.height;
-    const img=ctx.getImageData(0,0,w,h).data;
-    let top=h,bottom=-1,left=w,right=-1;
-    function notBlank(i){
-      const a=img[i+3];
-      if(a<8) return false;
-      const r=img[i],g=img[i+1],b=img[i+2];
-      return !(r>250 && g>250 && b>250);
-    }
-    for(let y=0;y<h;y++){
-      for(let x=0;x<w;x++){
-        const i=(y*w+x)*4;
-        if(notBlank(i)){
-          if(y<top) top=y;
-          if(y>bottom) bottom=y;
-          if(x<left) left=x;
-          if(x>right) right=x;
-        }
-      }
-    }
-    if(bottom<top || right<left) return srcCanvas;
-    left=Math.max(0,left-padding); top=Math.max(0,top-padding);
-    right=Math.min(w-1,right+padding); bottom=Math.min(h-1,bottom+padding);
-    const tw=right-left+1, th=bottom-top+1;
-    const out=document.createElement('canvas');
-    out.width=tw; out.height=th;
-    out.getContext('2d').drawImage(srcCanvas,left,top,tw,th,0,0,tw,th);
-    return out;
-  }catch(e){ return srcCanvas; }
-}
-
-async function captureQuoteDomCanvas(){
-  const h2c=await ensureHtml2Canvas();
-  const source=$("quoteSheet");
-  if(!source) throw new Error("未找到报价单区域");
-  const host=document.createElement('div');
-  host.className='quote-export-host';
-  host.style.cssText='position:fixed;left:-20000px;top:0;z-index:-1;padding:0;margin:0;background:#fff;';
-  const clone=source.cloneNode(true);
-  clone.classList.add('exporting');
-  clone.style.width='1080px';
-  clone.style.maxWidth='1080px';
-  clone.style.minWidth='1080px';
-  clone.style.margin='0';
-  host.appendChild(clone);
-  document.body.appendChild(host);
-  try{
-    await waitForExportReady(host);
-    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const scale=isMobile?1:2.2;
-    const rect=clone.getBoundingClientRect();
-    const canvas=await h2c(clone,{
-      backgroundColor:'#ffffff',
-      scale,
-      useCORS:true,
-      allowTaint:true,
-      logging:false,
-      width:Math.ceil(rect.width),
-      height:Math.ceil(rect.height),
-      windowWidth:1280,
-      windowHeight:Math.ceil(rect.height)+80,
-      scrollX:0,
-      scrollY:0
-    });
-    return trimCanvasWhitespace(canvas,8);
-  }finally{
-    host.remove();
-  }
-}
-
-
-
-
-function buildMobileQuotePayload(){
-  const c=calc(), s=c.school, set=data.settings;
-  const usdRows=buildUsdRows(c,s);
-  const phpRows=c.localItems.map(it=>[
-    it.name,
-    it.perWeek?`${it.amount} PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),
-    Math.round(it.total??it.amount).toLocaleString(),
-    it.excluded?"不含合计":(it.note||"")
-  ]);
-  return {
-    filename:`${s.name}-${s.campus}-${c.weeks}周-手机报价图.png`,
-    settings:{
-      brandName:set.brandName||"超能游学",
-      watermarkText:set.watermarkText||set.brandName||"超能游学",
-      slogan:quoteSlogan(),
-      logo:set.brandLogo||"",
-      advTitle:set.agencyAdvantageTitle||"超能游学优势",
-      adv1:set.agencyAdvantageLine1||"",
-      adv2:set.agencyAdvantageLine2||""
-    },
-    school:{
-      name:s.name||"",
-      campus:s.campus||"",
-      promoTitle:s.discounts?.schoolPromoTitle||"学校优惠",
-      promoText:s.discounts?.schoolPromoText||""
-    },
-    calc:{
-      weeks:c.weeks,
-      startDate:c.startDate,
-      endDate:c.endDate,
-      courseName:c.courseName||"-",
-      roomName:c.roomName||"-",
-      regFee:Math.round(c.originalRegistrationFee||0),
-      totalUsd:Math.round(c.totalUsd||0),
-      localPeso:Math.round(c.localPeso||0),
-      tuitionRmb:rmb(c.tuitionRmb),
-      localRmb:rmb(c.localRmb),
-      totalRmb:Math.round(c.totalRmb||0)
-    },
-    courseRows:c.courseDetails.map(d=>({name:d.item?.name||"-",weeks:d.weeks,lesson:courseLesson(d.item)||"以学校安排为准"})),
-    roomRows:c.roomDetails.map(d=>({name:d.item?.name||"-",weeks:d.weeks})),
-    usdRows,
-    phpRows
-  };
-}
-function submitQuotePayloadToPng(payload){
-  const form=document.createElement("form");
-  form.method="POST";
-  form.action="/api/quote-png";
-  form.target="_self";
-  form.enctype="application/x-www-form-urlencoded";
-  form.style.display="none";
-  const i=document.createElement("input");
-  i.type="hidden";
-  i.name="quote";
-  i.value=JSON.stringify(payload);
-  form.appendChild(i);
-  document.body.appendChild(form);
-  form.submit();
-}
-async function downloadMobileServerPng(){
-  const payload=buildMobileQuotePayload();
-  submitQuotePayloadToPng(payload);
-}
-
-function submitMobileImage(dataUrl, filename){
-  const form=document.createElement("form");
-  form.method="POST";
-  form.action="/api/mobile-image-download";
-  form.target="_self";
-  form.enctype="application/x-www-form-urlencoded";
-  form.style.display="none";
-
-  const i1=document.createElement("input");
-  i1.type="hidden";
-  i1.name="dataUrl";
-  i1.value=dataUrl;
-
-  const i2=document.createElement("input");
-  i2.type="hidden";
-  i2.name="filename";
-  i2.value=filename || "quote-mobile.jpg";
-
-  form.appendChild(i1);
-  form.appendChild(i2);
-  document.body.appendChild(form);
-  form.submit();
-}
-
-function resizeCanvasToWidth(srcCanvas, targetWidth){
-  const ratio=targetWidth/srcCanvas.width;
-  const targetHeight=Math.max(1,Math.round(srcCanvas.height*ratio));
-  const out=document.createElement("canvas");
-  out.width=targetWidth;
-  out.height=targetHeight;
-  const ctx=out.getContext("2d");
-  ctx.fillStyle="#ffffff";
-  ctx.fillRect(0,0,out.width,out.height);
-  ctx.imageSmoothingEnabled=true;
-  ctx.imageSmoothingQuality="high";
-  ctx.drawImage(srcCanvas,0,0,out.width,out.height);
-  return out;
-}
-
-function makeMobileJpgDataUrl(srcCanvas){
-  // 手机端专用：宽度压到 720，JPG压缩，避免接口和浏览器限制
-  let w=Math.min(720, srcCanvas.width);
-  let q=0.82;
-  let c=resizeCanvasToWidth(srcCanvas,w);
-  let url=c.toDataURL("image/jpeg",q);
-
-  // 如果还偏大，继续降尺寸/质量，保证能通过手机和Vercel
-  const maxLen=2.2*1024*1024; // base64字符串长度，约1.6MB文件
-  const widths=[680,640,600,560];
-  const qs=[0.78,0.72,0.68,0.62];
-  let wi=0, qi=0;
-  while(url.length>maxLen && (wi<widths.length || qi<qs.length)){
-    if(wi<widths.length){
-      w=widths[wi++];
-      c=resizeCanvasToWidth(srcCanvas,w);
-    }
-    if(qi<qs.length) q=qs[qi++];
-    url=c.toDataURL("image/jpeg",q);
-  }
-  return url;
-}
-
-async function downloadMobileImage(){
-  const c=calc(),s=c.school;
-  const filename=`${s.name}-${s.campus}-${c.weeks}周-手机报价图.jpg`;
-  let canvas=null;
-  try{
-    // 优先使用当前报价单模板截图，保持和电脑端最接近
-    canvas=await captureQuoteSvgCanvas();
-  }catch(err1){
-    console.warn("手机模板截图失败，切换DOM截图：",err1);
-    try{
-      canvas=await captureQuoteDomCanvas();
-    }catch(err2){
-      console.warn("DOM截图失败，切换原生图：",err2);
-      const ret=await drawNativeQuoteCanvas();
-      canvas=ret.canvas;
-    }
-  }
-  const jpg=makeMobileJpgDataUrl(canvas);
-  submitMobileImage(jpg,filename);
-}
-
-function openFinalMobileSavePage(){
-  try{
-    renderQuoteSheet();
-    const source=$("quoteSheet");
-    if(!source) throw new Error("未找到报价单区域");
-
-    const oldHtml=document.body.innerHTML;
-    const oldClass=document.body.className;
-    const oldBg=document.body.style.background;
-
-    const clone=source.cloneNode(true);
-    clone.id="quoteSheetMobileSave";
-    clone.classList.add("exporting");
-
-    const cssText=[...document.styleSheets].map(sheet=>{
-      try{return [...sheet.cssRules].map(r=>r.cssText).join("\n")}catch(e){return ""}
-    }).join("\n");
-
-    document.body.className="";
-    document.body.style.background="#111";
-    document.body.innerHTML=`<div id="mobileSavePage" style="min-height:100vh;background:#111;padding:0;margin:0;">
-      <style>${cssText}
-        html,body{margin:0!important;padding:0!important;background:#111!important;}
-        #mobileSaveBar{position:sticky;top:0;z-index:99999;background:rgba(0,0,0,.9);color:#fff;padding:10px 12px;font:14px -apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',Arial,sans-serif;line-height:1.5;}
-        #mobileSaveBar b{color:#ffd34d;}
-        #mobileSaveBack{float:right;border:0;border-radius:8px;background:#fff;color:#111;padding:6px 10px;font-weight:800;}
-        #mobileSaveWrap{width:100%;overflow:auto;background:#111;padding:0 0 20px;}
-        #mobileSaveInner{width:1000px;max-width:none;margin:0 auto;background:#fff;}
-        #mobileSaveInner .quote-sheet{width:1000px!important;max-width:1000px!important;min-width:1000px!important;box-shadow:none!important;border-radius:0!important;margin:0!important;}
-        @media(max-width:720px){
-          #mobileSaveInner{transform:scale(calc(100vw / 1000));transform-origin:top left;margin:0;width:1000px;}
-          #mobileSaveWrap{height:calc(var(--save-h, 1600px) * 100vw / 1000 + 30px);}
-        }
-      </style>
-      <div id="mobileSaveBar"><b>最终方案：</b>这里不是下载，是手机原生保存页面。请用手机系统截图保存；或长按报价单试试保存图片。<button id="mobileSaveBack">返回报价系统</button></div>
-      <div id="mobileSaveWrap"><div id="mobileSaveInner"></div></div>
-    </div>`;
-
-    document.getElementById("mobileSaveInner").appendChild(clone);
-
-    requestAnimationFrame(()=>{
-      const h=clone.scrollHeight||clone.getBoundingClientRect().height||1600;
-      document.getElementById("mobileSaveWrap").style.setProperty("--save-h", h+"px");
-    });
-
-    document.getElementById("mobileSaveBack").onclick=()=>{
-      document.body.innerHTML=oldHtml;
-      document.body.className=oldClass;
-      document.body.style.background=oldBg;
-      try{ init(); }catch(e){ location.reload(); }
-    };
-  }catch(err){
-    alert("打开最终手机保存页失败："+(err.message||err));
-  }
-}
-
 async function saveCanvasImage(canvas, filename){
   const safeName = filename || "报价单.png";
   const modal=ensureImagePreviewModal();
   const img=$("imagePreviewImg");
   const down=$("imagePreviewDownload");
   const openBtn=$("imagePreviewOpen");
-  const shareBtn=$("imagePreviewShare");
-  const copyBtn=$("imagePreviewCopy");
-  const fullBtn=$("imagePreviewFull");
-  const serverBtn=$("imagePreviewServer");
-  const realPngBtn=$("imagePreviewRealPng");
-  const finalBtn=$("imagePreviewFinal");
-  const tip=$("imagePreviewTip");
-  const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
-
-  function canvasToBlob(c){
-    return new Promise(resolve=>c.toBlob(resolve,"image/png",0.92));
-  }
-  function openRealPngFallback(dataUrl){
-    // 兜底，不作为手机主方案
-    const w=window.open(dataUrl,"_blank");
-    if(!w) location.href=dataUrl;
-  }
-
   try{
-    const blob = await canvasToBlob(canvas);
-    const dataUrl = canvas.toDataURL("image/png");
+    const blob = await new Promise(resolve=>canvas.toBlob(resolve,"image/png",0.92));
+    if(!blob) throw new Error("图片生成失败");
+    const blobUrl = URL.createObjectURL(blob);
 
-    img.src=dataUrl;
-    img.style.webkitUserSelect="auto";
-    img.style.userSelect="auto";
-    img.style.webkitTouchCallout="default";
-
+    img.src=blobUrl;
+    down.href=blobUrl;
+    down.download=safeName;
+    openBtn.onclick=()=>{
+      const w=window.open(blobUrl,"_blank");
+      if(!w){
+        alert("浏览器拦截了新窗口，请直接长按预览图片保存。");
+      }
+    };
     modal.classList.add("show");
 
-    if(isMobile){
-      if(tip) tip.textContent="手机最终方案：系统会生成压缩后的手机JPG图，打开后长按保存；如果失败再用最终手机保存页截图。";
-
-      if(finalBtn){
-        finalBtn.style.display="inline-flex";
-        finalBtn.onclick=()=>openFinalMobileSavePage();
-      }
-      down.textContent="最终手机保存页";
-      down.removeAttribute("download");
-      down.href="#";
-      down.onclick=(e)=>{e.preventDefault();openFinalMobileSavePage()};
-
-      // 其他按钮只做备用
-      if(realPngBtn){
-        realPngBtn.style.display="inline-flex";
-        realPngBtn.onclick=()=>openRealPngFallback(dataUrl);
-      }
-      if(serverBtn){
-        serverBtn.style.display="none";
-      }
-      if(fullBtn){
-        fullBtn.style.display="none";
-      }
-
-      openBtn.textContent="备用：打开图片";
-      openBtn.onclick=()=>openRealPngFallback(dataUrl);
-
-      if(blob && typeof File!=="undefined" && navigator.share){
-        try{
-          const file=new File([blob],safeName,{type:"image/png"});
-          const canShare=!navigator.canShare || navigator.canShare({files:[file]});
-          if(canShare){
-            shareBtn.style.display="inline-flex";
-            shareBtn.onclick=async()=>{
-              try{ await navigator.share({files:[file],title:safeName,text:"报价单图片"}); }
-              catch(err){ if(!err || err.name!=="AbortError") openFinalMobileSavePage(); }
-            };
-          }else{
-            shareBtn.style.display="none";
-          }
-        }catch(e){
-          shareBtn.style.display="none";
-        }
-      }else{
-        shareBtn.style.display="none";
-      }
-
-      copyBtn.style.display="none";
-    }else{
-      const blobUrl = blob ? URL.createObjectURL(blob) : dataUrl;
-      if(tip) tip.textContent="电脑端：点击“下载图片”。";
-      down.textContent="下载图片";
-      down.href=blobUrl;
-      down.download=safeName;
-      down.target="";
-      down.rel="";
-      down.onclick=null;
-      if(finalBtn) finalBtn.style.display="none";
-      if(realPngBtn) realPngBtn.style.display="none";
-      if(serverBtn) serverBtn.style.display="none";
-      if(fullBtn) fullBtn.style.display="none";
-      shareBtn.style.display="none";
-      copyBtn.style.display="none";
-      openBtn.textContent="打开大图";
-      openBtn.onclick=()=>openRealPngFallback(dataUrl);
+    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if(!isMobile){
       setTimeout(()=>{try{down.click()}catch(e){}},80);
     }
   }catch(err){
-    // 即便图片生成失败，手机端仍然可以打开DOM保存页
-    if(isMobile){
+    try{
+      const dataUrl = canvas.toDataURL("image/png");
+      img.src=dataUrl;
+      down.href=dataUrl;
+      down.download=safeName;
+      openBtn.onclick=()=>{
+        const w=window.open();
+        if(w){
+          w.document.write(`<title>${safeName}</title><img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`);
+          w.document.close();
+        }else{
+          alert("浏览器拦截了新窗口，请直接长按预览图片保存。");
+        }
+      };
       modal.classList.add("show");
-      if(tip) tip.textContent="图片生成失败也没关系，请点击“最终手机保存页”，用手机截图保存。";
-      if(finalBtn){
-        finalBtn.style.display="inline-flex";
-        finalBtn.onclick=()=>openFinalMobileSavePage();
-      }
-      down.textContent="最终手机保存页";
-      down.href="#";
-      down.onclick=(e)=>{e.preventDefault();openFinalMobileSavePage()};
-      openBtn.onclick=()=>openFinalMobileSavePage();
-      shareBtn.style.display="none";
-      copyBtn.style.display="none";
-      if(realPngBtn) realPngBtn.style.display="none";
-      if(serverBtn) serverBtn.style.display="none";
-      if(fullBtn) fullBtn.style.display="none";
-    }else{
+    }catch(e){
       alert("生成报价单图片失败："+(err.message||err));
     }
   }
@@ -1346,9 +882,9 @@ async function drawNativeQuoteCanvas(){
   ctx.fillStyle=grad;canvasRoundRect(ctx,margin,20,W-margin*2,150,22,true,false);
   if(logo)ctx.drawImage(logo,margin+18,38,112,112);
   ctx.fillStyle="#0639a6";ctx.font="bold 38px Arial, sans-serif";
-  drawWrap(ctx,`${s.name}${s.campus?`-${s.campus}`:""}`,margin+150,68,760,46,1);
-  ctx.font="bold 30px Arial, sans-serif";ctx.fillStyle="#111b63";
-  ctx.fillText(`游学报价单（${c.weeks}周）`,margin+150,116);
+  drawWrap(ctx,`${s.name} ${s.campus}`,margin+150,68,760,46,1);
+  ctx.font="bold 28px Arial, sans-serif";ctx.fillStyle="#111b63";
+  ctx.fillText(`游学报价单（${c.weeks}周）`,margin+150,114);
   ctx.fillStyle="#0798e8";canvasRoundRect(ctx,margin+150,128,470,34,17,true,false);
   ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(quoteSlogan(),margin+176,151);
 
@@ -1361,7 +897,7 @@ async function drawNativeQuoteCanvas(){
   let y=190;
   const infoW=(W-margin*2-4*10)/5;
   [
-    ["学校",`${s.name}${s.campus?`-${s.campus}`:""}`,s.campus],
+    ["学校",s.name,s.campus],
     ["时间",`${c.weeks}周`,`${c.startDate} 入学｜${c.endDate} 毕业`],
     ["课程",c.courseName||"-","报名周数下方列明"],
     ["房型",c.roomName||"-","住宿按所选房型"],
@@ -1458,22 +994,7 @@ async function drawNativeQuoteCanvas(){
 }
 async function downloadImage(){
   try{
-    const c=calc(),s=c.school;
-    let canvas;
-    const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
-    try{
-      // 手机端优先用无插件SVG截图，避免html2canvas/CDN/内存导致失败；模板不变。
-      canvas=isMobile ? await captureQuoteSvgCanvas() : await captureQuoteDomCanvas();
-    }catch(err1){
-      console.warn("第一导图方案失败，切换备用方案：",err1);
-      try{
-        canvas=isMobile ? await captureQuoteDomCanvas() : await captureQuoteSvgCanvas();
-      }catch(err2){
-        console.warn("DOM/SVG导图都失败，自动切换原生导图：",err2);
-        const nativeRet=await drawNativeQuoteCanvas();
-        canvas=nativeRet.canvas;
-      }
-    }
+    const {canvas,c,s}=await drawNativeQuoteCanvas();
     await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`);
   }catch(err){
     alert("生成报价单图片失败："+(err.message||err));
@@ -1905,33 +1426,17 @@ async function deleteAgent(id){
 }
 
 
-
-async function autoFixMissingSchoolData(){
-  try{
-    const onlyDefault = data && data.schools && data.schools.length===1 && data.schools[0].id==="cg-banilad";
-    if(!onlyDefault) return;
-    const ok = await loadCloudData(true);
-    if(ok && data.schools && data.schools.length>1){
-      refreshAll();
-    }
-  }catch(e){}
-}
 function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(["courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2"].includes(id)){lastChangedMultiWeek=id}if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){lastChangedMultiWeek="";updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
-  const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
   const btn=$("downloadImage");
   const old=btn.textContent;
-  btn.disabled=true;
-  btn.textContent=isMobile?"正在生成手机PNG...":"正在生成图片...";
   try{
-    if(isMobile){
-      await downloadMobileServerPng();
-      return;
-    }
+    btn.disabled=true;
+    btn.textContent="正在生成图片...";
     await downloadImage();
-  }catch(err){
-    alert("生成报价单图片失败："+(err.message||err));
+  }catch(e){
+    alert("生成图片失败："+(e.message||e));
   }finally{
     btn.disabled=false;
     btn.textContent=old;
   }
-};$("printPdf").onclick=()=>window.print();$("addSchool").onclick=async()=>{try{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveLocalOnly();refreshAll();activateTab("schools");scheduleCloudSave();setTimeout(()=>{const el=$("schoolName");if(el){el.focus();el.select&&el.select()}},50)}catch(err){alert("新增学校失败："+(err.message||err))}};$("backupBtn").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="超能游学报价系统数据备份.json";a.click()};$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{data=normalize(JSON.parse(r.result));saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){localStorage.removeItem(currentStorageKey());data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData();setTimeout(autoFixMissingSchoolData,800)}init();
+};$("printPdf").onclick=()=>window.print();$("addSchool").onclick=async()=>{try{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveLocalOnly();refreshAll();activateTab("schools");scheduleCloudSave();setTimeout(()=>{const el=$("schoolName");if(el){el.focus();el.select&&el.select()}},50)}catch(err){alert("新增学校失败："+(err.message||err))}};$("backupBtn").onclick=()=>{let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="超能游学报价系统数据备份.json";a.click()};$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{data=normalize(JSON.parse(r.result));saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){localStorage.removeItem(currentStorageKey());data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData()}init();
