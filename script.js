@@ -673,7 +673,7 @@ function renderQuoteSheet(){
     <div class="info-grid">
       ${info("学校",s.name,s.campus)}
       ${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜${c.endDate} 周六毕业`)}
-      ${info("课程",c.courseName||"-","报名周数已列明")}
+      ${info("课程",c.courseName||"-","")}
       ${info("房型",c.roomName||"-","住宿按所选房型")}
       ${info("注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,"")}
     </div>
@@ -1030,7 +1030,7 @@ ${set.agencyAdvantageLine2}`,420,10).length
   [
     ["学校",`${s.name}-${s.campus}`.replace(/^-/,''),""],
     ["时间",`${c.weeks}周`,`${c.startDate} 周日入学｜${c.endDate} 周六毕业`],
-    ["课程",c.courseName||"-","报名周数已列明"],
+    ["课程",c.courseName||"-",""],
     ["房型",c.roomName||"-","住宿按所选房型"],
     ["注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,""]
   ].forEach((it,i)=>infoCard(margin+i*(infoW+10),y,infoW,infoCardH,it[0],it[1],it[2]));
@@ -1086,10 +1086,12 @@ ${set.agencyAdvantageLine2}`,420,10).length
 
     let endY=drawNativeTable(ctx,["项目","说明","金额","备注"],rows,x+12,tableStartY,panelW-24,opt);
     const totalY=endY+6;
-    ctx.fillStyle="#fff";ctx.fillRect(x+12,totalY,panelW-24,38);
-    ctx.fillStyle=green?"#0b8b53":"#0d43b4";ctx.font="bold 20px Arial, sans-serif";ctx.fillText(totalText,x+240,totalY+27);
+    ctx.fillStyle="#fff";ctx.fillRect(x+12,totalY,panelW-24,42);
+    ctx.fillStyle=green?"#0b8b53":"#0d43b4";ctx.font="bold 18px Arial, sans-serif";
+    ctx.fillText(totalText,x+16,totalY+28);
     const tw=ctx.measureText(totalAmount).width;
-    ctx.fillStyle="#e4251a";ctx.font="bold 26px Arial, sans-serif";ctx.fillText(totalAmount,x+panelW-20-tw,totalY+28);
+    ctx.fillStyle="#e4251a";ctx.font="bold 26px Arial, sans-serif";
+    ctx.fillText(totalAmount,x+panelW-18-tw,totalY+29);
     return dynamicH;
   }
 
