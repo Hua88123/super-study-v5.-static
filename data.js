@@ -109,6 +109,34 @@ async function agentValid(req){
 function maskKey(key){return !key?"":(key.slice(0,8)+"..."+key.slice(-6))}
 function makeId(prefix){return prefix+"_"+Date.now()+"_"+Math.random().toString(36).slice(2,8)}
 
+function schoolCount(payload){
+  return payload && Array.isArray(payload.schools) ? payload.schools.length : 0;
+}
+async function getMainRow(){
+  const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
+  const r = await sbRequest("GET", path);
+  if(!r.ok) throw new Error(r.text);
+  const rows = JSON.parse(r.text || "[]");
+  return rows[0] || null;
+}
+async function saveBackupRow(oldPayload, reason="auto"){
+  try{
+    if(!oldPayload) return;
+    const stamp = new Date().toISOString().replace(/[-:.TZ]/g,"").slice(0,14);
+    const id = `backup_${stamp}_${Math.random().toString(36).slice(2,7)}`;
+    const payload = {
+      backupOf: DATA_ROW,
+      reason,
+      schoolCount: schoolCount(oldPayload),
+      createdAt: new Date().toISOString(),
+      payload: oldPayload
+    };
+    const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?on_conflict=id`;
+    await sbRequest("POST", path, {id, payload, updated_at:new Date().toISOString()});
+  }catch(e){}
+}
+
+
 module.exports = async function handler(req, res) {
   try {
     const debug = req.url && req.url.includes("debug=1");
@@ -144,6 +172,13 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "GET") {
       if(!admin && !empOk && !agOk) return json(res, 401, {error:"未授权，请先登录员工/中介或管理员"});
+      if (req.url && req.url.includes("backups=1")) {
+        if(!admin) return json(res, 403, {error:"只有管理员可以查看云端历史备份"});
+        const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=like.backup_%25&select=id,payload,updated_at&order=updated_at.desc&limit=30`;
+        const r = await sbRequest("GET", path);
+        if(!r.ok) return json(res,r.status,{error:r.text});
+        return json(res,200,{backups:JSON.parse(r.text||"[]")});
+      }
       const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?id=eq.${encodeURIComponent(DATA_ROW)}&select=payload,updated_at`;
       const r = await sbRequest("GET", path);
       if(!r.ok) return json(res,r.status,{error:r.text});
@@ -156,11 +191,29 @@ module.exports = async function handler(req, res) {
       const raw = await readBody(req);
       const body = raw ? JSON.parse(raw) : {};
       if(!body.payload) return json(res,400,{error:"缺少 payload"});
-      const payload={id:DATA_ROW,payload:body.payload,updated_at:new Date().toISOString()};
+
+      const incoming = body.payload;
+      const incomingCount = schoolCount(incoming);
+      const oldRow = await getMainRow().catch(()=>null);
+      const oldPayload = oldRow && oldRow.payload;
+      const oldCount = schoolCount(oldPayload);
+
+      // 防丢保护：云端学校数量明显更多时，禁止少量/默认数据覆盖云端。
+      // 如确实需要覆盖，可传 allowDangerousOverwrite=true。
+      if(!body.allowDangerousOverwrite && oldCount > 1 && incomingCount < oldCount){
+        return json(res,409,{
+          error:`防丢保护：云端已有 ${oldCount} 个学校，本次只有 ${incomingCount} 个学校，已阻止覆盖。请先从云端刷新数据，确认无误后再操作。`,
+          oldSchoolCount:oldCount,
+          incomingSchoolCount:incomingCount
+        });
+      }
+
+      await saveBackupRow(oldPayload, "before_upload");
+      const payload={id:DATA_ROW,payload:incoming,updated_at:new Date().toISOString()};
       const path = `/rest/v1/${encodeURIComponent(DATA_TABLE)}?on_conflict=id`;
       const r = await sbRequest("POST", path, payload);
       if(!r.ok) return json(res,r.status,{error:r.text});
-      return json(res,200,{ok:true});
+      return json(res,200,{ok:true, backupCreated:!!oldPayload});
     }
 
     return json(res,405,{error:"Method not allowed"});

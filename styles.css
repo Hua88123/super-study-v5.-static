@@ -329,3 +329,125 @@
   margin: 0 0 6px;
   color: #0639a6;
 }
+
+
+/* V10.8 课程课时 & 稳定导图增强 */
+.course-extra {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1.25fr .75fr;
+  gap: 12px;
+}
+.course-extra > div {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  padding: 14px 16px;
+}
+.course-extra h4 {
+  margin: 0 0 10px;
+  color: var(--blue);
+  font-size: 18px;
+}
+.course-extra-list {
+  display: grid;
+  gap: 8px;
+}
+.course-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 10px;
+  align-items: start;
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 7px;
+}
+.course-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.course-row b {
+  color: #111b63;
+  font-size: 15px;
+}
+.course-row span {
+  color: #44506f;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.promo p {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.quote-export-host .quote-sheet,
+.quote-sheet.exporting {
+  width: 1080px !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+.quote-export-host .info-grid,
+.quote-sheet.exporting .info-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5,1fr) !important;
+}
+.quote-export-host .promo-grid,
+.quote-sheet.exporting .promo-grid,
+.quote-export-host .cost-grid,
+.quote-sheet.exporting .cost-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+}
+.quote-export-host .sum-grid,
+.quote-sheet.exporting .sum-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 40px 1fr 40px 1.1fr !important;
+}
+.quote-export-host .course-extra,
+.quote-sheet.exporting .course-extra {
+  display: grid !important;
+  grid-template-columns: 1.25fr .75fr !important;
+}
+.quote-export-host .plus,
+.quote-export-host .equals,
+.quote-sheet.exporting .plus,
+.quote-sheet.exporting .equals {
+  display: block !important;
+}
+@media(max-width:1180px){
+  .course-extra{grid-template-columns:1fr}
+  .course-row{grid-template-columns:1fr}
+}
+
+
+/* V10.9 手机端导图稳定修复 */
+.quote-export-host {
+  contain: layout style paint;
+}
+.quote-export-host .quote-sheet,
+.quote-sheet.exporting {
+  width: 1080px !important;
+  max-width: 1080px !important;
+  min-width: 1080px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  transform: none !important;
+}
+.quote-export-host table,
+.quote-sheet.exporting table {
+  page-break-inside: avoid;
+}
+.quote-export-host img,
+.quote-sheet.exporting img {
+  max-width: 100%;
+}
+
+
+/* V11.2.1 防丢备份中心 + 手机电脑同款导图 */
+#backupManager .list-item {
+  background:#fff;
+}
+.image-preview-scroll img {
+  -webkit-touch-callout: default !important;
+  user-select: auto !important;
+}
