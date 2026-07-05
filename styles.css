@@ -888,3 +888,27 @@ th,td{padding:5px 5px !important; line-height:1.25 !important; vertical-align:to
     max-width: none !important;
   }
 }
+
+
+/* V11.9 只修手机端保存流程，不改报价图模板 */
+#imagePreviewFull {
+  background:#fff7d9;
+  color:#7a4b00;
+  border:1px solid #ffd98c;
+  box-shadow:none;
+}
+.image-preview-scroll img {
+  -webkit-touch-callout: default !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  pointer-events: auto !important;
+}
+@media (max-width: 720px) {
+  .image-preview-scroll {
+    max-height: 64vh;
+  }
+  .image-preview-scroll img {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
