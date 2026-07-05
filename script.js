@@ -658,6 +658,79 @@ function ensureImagePreviewModal(){
   return modal;
 }
 
+function trimCanvasWhitespace(srcCanvas,padding=6){
+  try{
+    const ctx=srcCanvas.getContext("2d",{willReadFrequently:true});
+    const w=srcCanvas.width,h=srcCanvas.height;
+    const img=ctx.getImageData(0,0,w,h).data;
+    let top=h,bottom=-1,left=w,right=-1;
+    function notBlank(i){
+      const a=img[i+3];
+      if(a<8) return false;
+      const r=img[i],g=img[i+1],b=img[i+2];
+      return !(r>250 && g>250 && b>250);
+    }
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const i=(y*w+x)*4;
+        if(notBlank(i)){
+          if(y<top) top=y;
+          if(y>bottom) bottom=y;
+          if(x<left) left=x;
+          if(x>right) right=x;
+        }
+      }
+    }
+    if(bottom<top || right<left) return srcCanvas;
+    left=Math.max(0,left-padding); top=Math.max(0,top-padding);
+    right=Math.min(w-1,right+padding); bottom=Math.min(h-1,bottom+padding);
+    const tw=right-left+1, th=bottom-top+1;
+    const out=document.createElement('canvas');
+    out.width=tw; out.height=th;
+    out.getContext('2d').drawImage(srcCanvas,left,top,tw,th,0,0,tw,th);
+    return out;
+  }catch(e){ return srcCanvas; }
+}
+
+async function captureQuoteDomCanvas(){
+  const h2c=await ensureHtml2Canvas();
+  const source=$("quoteSheet");
+  if(!source) throw new Error("未找到报价单区域");
+  const host=document.createElement('div');
+  host.className='quote-export-host';
+  host.style.cssText='position:fixed;left:-20000px;top:0;z-index:-1;padding:0;margin:0;background:#fff;';
+  const clone=source.cloneNode(true);
+  clone.classList.add('exporting');
+  clone.style.width='1080px';
+  clone.style.maxWidth='1080px';
+  clone.style.minWidth='1080px';
+  clone.style.margin='0';
+  host.appendChild(clone);
+  document.body.appendChild(host);
+  try{
+    await waitForExportReady(host);
+    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const scale=isMobile?2:2.2;
+    const rect=clone.getBoundingClientRect();
+    const canvas=await h2c(clone,{
+      backgroundColor:'#ffffff',
+      scale,
+      useCORS:true,
+      allowTaint:true,
+      logging:false,
+      width:Math.ceil(rect.width),
+      height:Math.ceil(rect.height),
+      windowWidth:1280,
+      windowHeight:Math.ceil(rect.height)+80,
+      scrollX:0,
+      scrollY:0
+    });
+    return trimCanvasWhitespace(canvas,8);
+  }finally{
+    host.remove();
+  }
+}
+
 async function saveCanvasImage(canvas, filename){
   const safeName = filename || "报价单.png";
   const modal=ensureImagePreviewModal();
@@ -995,7 +1068,15 @@ async function drawNativeQuoteCanvas(){
 }
 async function downloadImage(){
   try{
-    const {canvas,c,s}=await drawNativeQuoteCanvas();
+    const c=calc(),s=c.school;
+    let canvas;
+    try{
+      canvas=await captureQuoteDomCanvas();
+    }catch(err){
+      console.warn("DOM截图失败，自动切换原生导图：",err);
+      const nativeRet=await drawNativeQuoteCanvas();
+      canvas=nativeRet.canvas;
+    }
     await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`);
   }catch(err){
     alert("生成报价单图片失败："+(err.message||err));

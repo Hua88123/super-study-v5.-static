@@ -781,3 +781,95 @@ th,td{
   .sum-grid{grid-template-columns:1fr;}
   .plus,.equals{display:none;}
 }
+
+
+/* V11.6 紧凑规格优化：减少空白层，导图与电脑显示保持一致 */
+.quote-sheet{
+  width:1000px !important;
+  max-width:1000px !important;
+  padding:22px !important;
+  border-radius:24px !important;
+}
+.sheet-head{
+  min-height:138px !important;
+  grid-template-columns:140px 1fr !important;
+  gap:18px !important;
+  padding:18px 22px !important;
+  border-radius:20px !important;
+}
+.sheet-logo{
+  width:96px !important;
+  height:96px !important;
+}
+.sheet-title h2{
+  font-size:34px !important;
+  margin:0 0 8px !important;
+}
+.sheet-title h3{
+  font-size:28px !important;
+  margin:0 0 8px !important;
+}
+.slogan{
+  font-size:14px !important;
+  padding:8px 16px !important;
+}
+.info-grid{
+  gap:10px !important;
+  margin-top:12px !important;
+}
+.info{
+  min-height:110px !important;
+  padding:12px 13px !important;
+  border-radius:14px !important;
+}
+.info small{font-size:14px !important;}
+.info b{font-size:16px !important; line-height:1.28 !important; margin-top:6px !important;}
+.info span{font-size:11px !important; line-height:1.35 !important; margin-top:4px !important;}
+.course-extra{
+  gap:10px !important;
+  margin-top:12px !important;
+}
+.course-extra>div{
+  padding:12px 14px !important;
+  border-radius:16px !important;
+}
+.course-extra h4{font-size:16px !important; margin:0 0 8px !important;}
+.course-row{grid-template-columns:190px 1fr !important; gap:8px !important;}
+.course-row b{font-size:14px !important;}
+.course-row span{font-size:13px !important; line-height:1.35 !important;}
+.promo-grid{margin-top:12px !important; gap:10px !important;}
+.promo{min-height:98px !important; padding:12px 14px !important; border-radius:16px !important;}
+.promo h4{font-size:15px !important; margin-bottom:8px !important;}
+.promo p{font-size:13px !important; line-height:1.45 !important; margin:0 !important;}
+.cost-grid{gap:12px !important; margin-top:12px !important;}
+.panel{border-radius:18px !important;}
+.panel h4{font-size:17px !important; padding:12px 14px !important;}
+table{font-size:11.5px !important;}
+th,td{padding:5px 5px !important; line-height:1.25 !important; vertical-align:top !important;}
+.panel-total{padding:12px 14px !important; font-size:16px !important;}
+.panel-total strong{font-size:24px !important;}
+.summary{margin-top:12px !important; padding:14px !important; border-radius:18px !important;}
+.summary h4{font-size:22px !important; margin:0 0 12px !important;}
+.sum-grid{grid-template-columns:1fr 34px 1fr 34px 1.08fr !important; gap:8px !important;}
+.sum-item{padding:10px 12px !important; border-radius:14px !important;}
+.sum-item small{font-size:12px !important;}
+.sum-item b{font-size:18px !important; margin-top:2px !important;}
+.plus,.equals{font-size:30px !important;}
+.final b{font-size:30px !important;}
+.foot{margin-top:12px !important; padding:10px 12px !important; border-radius:14px !important; font-size:12px !important; line-height:1.45 !important;}
+
+/* 导图时同步使用紧凑宽度 */
+.quote-export-host .quote-sheet,
+.quote-sheet.exporting{
+  width:1000px !important;
+  max-width:1000px !important;
+  min-width:1000px !important;
+}
+.quote-export-host .sheet-head,
+.quote-sheet.exporting .sheet-head{
+  grid-template-columns:140px 1fr !important;
+}
+.quote-export-host .course-row,
+.quote-sheet.exporting .course-row{
+  grid-template-columns:190px 1fr !important;
+}
