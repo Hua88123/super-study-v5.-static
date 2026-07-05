@@ -988,8 +988,8 @@ ${set.agencyAdvantageLine2}`,420,10).length
   const panelW=(W-margin*2-14)/2;
   const usdTableEstimate=36+usdRows.reduce((a,r)=>a+rowHeightByText(temp,r,usdCols),0);
   const phpTableEstimate=36+phpRows.reduce((a,r)=>a+rowHeightByText(temp,r,phpCols,{singleLineCols:[0],smallCols:[0]}),0);
-  const leftPanelH=Math.max(255,62+usdTableEstimate+52);
-  const rightPanelH=Math.max(255,62+phpTableEstimate+52);
+  const leftPanelH=62+usdTableEstimate+44;
+  const rightPanelH=62+phpTableEstimate+44;
   const panelH=Math.max(leftPanelH,rightPanelH);
 
   const summaryH=176;
@@ -1078,7 +1078,7 @@ ${set.agencyAdvantageLine2}`,420,10).length
     const col=opt.colWidths || [(panelW-24)*.22,(panelW-24)*.40,(panelW-24)*.20,(panelW-24)*.18];
     let tableEstimate=36;
     rows.forEach(r=>tableEstimate+=rowHeightByText(ctx,r,col,opt));
-    const dynamicH=Math.max(255,62+tableEstimate+52);
+    const dynamicH=62+tableEstimate+44;
 
     ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y,panelW,dynamicH,20,true,true);
     ctx.fillStyle=green?"#0b8b53":"#0d43b4";canvasRoundRect(ctx,x,y,panelW,headerH,20,true,false);
@@ -1089,9 +1089,9 @@ ${set.agencyAdvantageLine2}`,420,10).length
     ctx.fillStyle="#fff";ctx.fillRect(x+12,totalY,panelW-24,42);
     ctx.fillStyle=green?"#0b8b53":"#0d43b4";ctx.font="bold 18px Arial, sans-serif";
     ctx.fillText(totalText,x+16,totalY+28);
-    const tw=ctx.measureText(totalAmount).width;
+    const labelW=ctx.measureText(totalText).width;
     ctx.fillStyle="#e4251a";ctx.font="bold 26px Arial, sans-serif";
-    ctx.fillText(totalAmount,x+panelW-18-tw,totalY+29);
+    ctx.fillText(totalAmount,x+16+labelW+8,totalY+29);
     return dynamicH;
   }
 
