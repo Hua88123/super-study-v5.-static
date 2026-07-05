@@ -418,3 +418,26 @@
   .course-extra{grid-template-columns:1fr}
   .course-row{grid-template-columns:1fr}
 }
+
+
+/* V10.9 手机端导图稳定修复 */
+.quote-export-host {
+  contain: layout style paint;
+}
+.quote-export-host .quote-sheet,
+.quote-sheet.exporting {
+  width: 1080px !important;
+  max-width: 1080px !important;
+  min-width: 1080px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  transform: none !important;
+}
+.quote-export-host table,
+.quote-sheet.exporting table {
+  page-break-inside: avoid;
+}
+.quote-export-host img,
+.quote-sheet.exporting img {
+  max-width: 100%;
+}

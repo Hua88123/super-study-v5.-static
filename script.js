@@ -601,10 +601,11 @@ function loadExternalScript(src){
 async function ensureHtml2Canvas(){
   if(window.html2canvas) return window.html2canvas;
   const cdns=[
-    "https://cdn.staticfile.org/html2canvas/1.4.1/html2canvas.min.js",
+    
     "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
     "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
-    "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"
+    "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js",
+    "https://cdn.staticfile.org/html2canvas/1.4.1/html2canvas.min.js"
   ];
   let lastErr=null;
   for(const url of cdns){
@@ -613,8 +614,9 @@ async function ensureHtml2Canvas(){
       if(window.html2canvas) return window.html2canvas;
     }catch(err){ lastErr=err; }
   }
-  throw lastErr || new Error("截图组件加载失败");
+  throw lastErr || new Error("截图组件加载失败，请检查手机网络后重试");
 }
+
 function waitForQuoteImages(root){
   const imgs=[...root.querySelectorAll("img")];
   return Promise.all(imgs.map(img=>{
@@ -657,36 +659,78 @@ function ensureImagePreviewModal(){
 
 async function saveCanvasImage(canvas, filename){
   const safeName = filename || "报价单.png";
+  const modal=ensureImagePreviewModal();
+  const img=$("imagePreviewImg");
+  const down=$("imagePreviewDownload");
+  const openBtn=$("imagePreviewOpen");
   try{
-    const dataUrl = canvas.toDataURL("image/png");
-    const modal=ensureImagePreviewModal();
-    const img=$("imagePreviewImg");
-    const down=$("imagePreviewDownload");
-    const openBtn=$("imagePreviewOpen");
-    img.src=dataUrl;
-    down.href=dataUrl;
+    const blob = await new Promise(resolve=>canvas.toBlob(resolve,"image/png",0.92));
+    if(!blob) throw new Error("图片生成失败");
+    const blobUrl = URL.createObjectURL(blob);
+
+    img.src=blobUrl;
+    down.href=blobUrl;
     down.download=safeName;
     openBtn.onclick=()=>{
-      const w=window.open();
-      if(w){
-        w.document.write(`<title>${safeName}</title><img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`);
-        w.document.close();
-      }else{
+      const w=window.open(blobUrl,"_blank");
+      if(!w){
         alert("浏览器拦截了新窗口，请直接长按预览图片保存。");
       }
     };
     modal.classList.add("show");
 
-    // 电脑端尝试自动下载；手机端保留预览，避免点击没反应
     const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if(!isMobile){
       setTimeout(()=>{try{down.click()}catch(e){}},80);
     }
   }catch(err){
-    alert("生成报价单图片失败："+(err.message||err));
+    try{
+      const dataUrl = canvas.toDataURL("image/png");
+      img.src=dataUrl;
+      down.href=dataUrl;
+      down.download=safeName;
+      openBtn.onclick=()=>{
+        const w=window.open();
+        if(w){
+          w.document.write(`<title>${safeName}</title><img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`);
+          w.document.close();
+        }else{
+          alert("浏览器拦截了新窗口，请直接长按预览图片保存。");
+        }
+      };
+      modal.classList.add("show");
+    }catch(e){
+      alert("生成报价单图片失败："+(err.message||err));
+    }
   }
 }
 
+async function imageToDataUrl(src){
+  if(!src || String(src).startsWith("data:")) return src;
+  try{
+    const res=await fetch(src,{cache:"force-cache"});
+    const blob=await res.blob();
+    return await new Promise((resolve,reject)=>{
+      const fr=new FileReader();
+      fr.onload=()=>resolve(fr.result);
+      fr.onerror=reject;
+      fr.readAsDataURL(blob);
+    });
+  }catch(e){
+    return src;
+  }
+}
+async function inlineCloneImages(root){
+  const imgs=[...root.querySelectorAll("img")];
+  for(const img of imgs){
+    const src=img.getAttribute("src")||img.src;
+    if(src){
+      img.setAttribute("crossorigin","anonymous");
+      const data=await imageToDataUrl(src);
+      if(data) img.src=data;
+    }
+  }
+}
 async function downloadImage(){
   let host=null;
   try{
@@ -699,29 +743,36 @@ async function downloadImage(){
 
     host=document.createElement("div");
     host.className="quote-export-host";
-    host.style.cssText="position:fixed;left:-12000px;top:0;width:1120px;background:#fff;z-index:-1;pointer-events:none;opacity:1;";
+    host.style.cssText="position:absolute;left:-99999px;top:0;width:1080px;background:#fff;z-index:-1;pointer-events:none;opacity:1;";
     const clone=original.cloneNode(true);
     clone.id="quoteSheetExport";
     clone.classList.add("exporting");
     host.appendChild(clone);
     document.body.appendChild(host);
 
+    await inlineCloneImages(clone);
     await waitForExportReady(clone);
 
     const width=Math.ceil(clone.scrollWidth || 1080);
     const height=Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 1600);
 
+    // 手机端内存较小，使用较低 scale，避免 canvas 过大导致失败。
+    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const scale=isMobile?1.25:2;
+
     const canvas = await html2canvas(clone,{
       backgroundColor:"#ffffff",
       useCORS:true,
-      allowTaint:false,
-      scale:2,
+      allowTaint:true,
+      scale,
       width,
       height,
       windowWidth:1280,
       windowHeight:Math.max(height,900),
       scrollX:0,
-      scrollY:0
+      scrollY:0,
+      logging:false,
+      removeContainer:true
     });
 
     host.remove();
@@ -730,7 +781,7 @@ async function downloadImage(){
     await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`);
   }catch(err){
     if(host) host.remove();
-    alert("生成报价单图片失败："+(err.message||err));
+    alert("生成报价单图片失败："+(err.message||err)+"。手机端建议刷新页面后再点一次。");
   }
 }
 function renderRecords(){$("recordsList").innerHTML=data.records.length?data.records.map((r,i)=>`<div class="list-item"><div><b>${r.title}</b><br/><span class="muted">${r.createdAt}</span></div><div class="list-actions"><button onclick="navigator.clipboard.writeText(data.records[${i}].text)">复制</button><button class="danger" onclick="deleteRecord(${i})">删除</button></div></div>`).join(""):`<p class="muted">暂无报价记录</p>`}function deleteRecord(i){data.records.splice(i,1);saveData();renderRecords()}
