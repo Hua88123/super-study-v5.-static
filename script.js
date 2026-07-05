@@ -650,6 +650,8 @@ function ensureImagePreviewModal(){
       <a id="imagePreviewDownload" class="button-link" download="报价单.png">下载图片</a>
       <button class="secondary" id="imagePreviewShare" style="display:none;">系统分享/保存</button>
       <button class="secondary" id="imagePreviewCopy" style="display:none;">复制图片</button>
+      <button class="secondary" id="imagePreviewFinal">最终手机保存页</button>
+      <button class="secondary" id="imagePreviewRealPng">打开真实PNG保存</button>
       <button class="secondary" id="imagePreviewServer">手机保存页</button>
       <button class="secondary" id="imagePreviewFull">全屏保存模式</button>
       <button class="secondary" id="imagePreviewOpen">打开大图长按保存</button>
@@ -815,6 +817,63 @@ async function captureQuoteDomCanvas(){
   }
 }
 
+
+function openFinalMobileSavePage(){
+  try{
+    renderQuoteSheet();
+    const source=$("quoteSheet");
+    if(!source) throw new Error("未找到报价单区域");
+
+    const oldHtml=document.body.innerHTML;
+    const oldClass=document.body.className;
+    const oldBg=document.body.style.background;
+
+    const clone=source.cloneNode(true);
+    clone.id="quoteSheetMobileSave";
+    clone.classList.add("exporting");
+
+    const cssText=[...document.styleSheets].map(sheet=>{
+      try{return [...sheet.cssRules].map(r=>r.cssText).join("\n")}catch(e){return ""}
+    }).join("\n");
+
+    document.body.className="";
+    document.body.style.background="#111";
+    document.body.innerHTML=`<div id="mobileSavePage" style="min-height:100vh;background:#111;padding:0;margin:0;">
+      <style>${cssText}
+        html,body{margin:0!important;padding:0!important;background:#111!important;}
+        #mobileSaveBar{position:sticky;top:0;z-index:99999;background:rgba(0,0,0,.9);color:#fff;padding:10px 12px;font:14px -apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',Arial,sans-serif;line-height:1.5;}
+        #mobileSaveBar b{color:#ffd34d;}
+        #mobileSaveBack{float:right;border:0;border-radius:8px;background:#fff;color:#111;padding:6px 10px;font-weight:800;}
+        #mobileSaveWrap{width:100%;overflow:auto;background:#111;padding:0 0 20px;}
+        #mobileSaveInner{width:1000px;max-width:none;margin:0 auto;background:#fff;}
+        #mobileSaveInner .quote-sheet{width:1000px!important;max-width:1000px!important;min-width:1000px!important;box-shadow:none!important;border-radius:0!important;margin:0!important;}
+        @media(max-width:720px){
+          #mobileSaveInner{transform:scale(calc(100vw / 1000));transform-origin:top left;margin:0;width:1000px;}
+          #mobileSaveWrap{height:calc(var(--save-h, 1600px) * 100vw / 1000 + 30px);}
+        }
+      </style>
+      <div id="mobileSaveBar"><b>最终方案：</b>这里不是下载，是手机原生保存页面。请用手机系统截图保存；或长按报价单试试保存图片。<button id="mobileSaveBack">返回报价系统</button></div>
+      <div id="mobileSaveWrap"><div id="mobileSaveInner"></div></div>
+    </div>`;
+
+    document.getElementById("mobileSaveInner").appendChild(clone);
+
+    requestAnimationFrame(()=>{
+      const h=clone.scrollHeight||clone.getBoundingClientRect().height||1600;
+      document.getElementById("mobileSaveWrap").style.setProperty("--save-h", h+"px");
+    });
+
+    document.getElementById("mobileSaveBack").onclick=()=>{
+      document.body.innerHTML=oldHtml;
+      document.body.className=oldClass;
+      document.body.style.background=oldBg;
+      try{ init(); }catch(e){ location.reload(); }
+    };
+  }catch(err){
+    alert("打开最终手机保存页失败："+(err.message||err));
+  }
+}
+
 async function saveCanvasImage(canvas, filename){
   const safeName = filename || "报价单.png";
   const modal=ensureImagePreviewModal();
@@ -825,74 +884,18 @@ async function saveCanvasImage(canvas, filename){
   const copyBtn=$("imagePreviewCopy");
   const fullBtn=$("imagePreviewFull");
   const serverBtn=$("imagePreviewServer");
+  const realPngBtn=$("imagePreviewRealPng");
+  const finalBtn=$("imagePreviewFinal");
   const tip=$("imagePreviewTip");
   const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
 
   function canvasToBlob(c){
     return new Promise(resolve=>c.toBlob(resolve,"image/png",0.92));
   }
-
-  function postToMobileSavePage(dataUrl){
-    // 用真实 Vercel API 页面承载图片，避开手机端 blob/dataURL 下载失败。
-    // 当前页跳转，避免微信/手机浏览器拦截新窗口。
-    try{
-      const form=document.createElement("form");
-      form.method="POST";
-      form.action="/api/image-page";
-      form.target="_self";
-      form.style.display="none";
-
-      const i1=document.createElement("input");
-      i1.type="hidden";
-      i1.name="dataUrl";
-      i1.value=dataUrl;
-
-      const i2=document.createElement("input");
-      i2.type="hidden";
-      i2.name="filename";
-      i2.value=safeName;
-
-      form.appendChild(i1);
-      form.appendChild(i2);
-      document.body.appendChild(form);
-      form.submit();
-    }catch(e){
-      enterFullSavePage(dataUrl);
-    }
-  }
-
-  function enterFullSavePage(dataUrl){
-    // 纯前端兜底：不改图片模板，只把生成好的图片全屏展示。
-    const oldHtml=document.body.innerHTML;
-    const oldBg=document.body.style.background;
-    document.body.style.background="#111";
-    document.body.innerHTML=`<div style="min-height:100vh;background:#111;padding:0;margin:0;">
-      <div style="position:sticky;top:0;z-index:99;background:rgba(0,0,0,.86);color:#fff;padding:10px 12px;font:14px -apple-system,BlinkMacSystemFont,'PingFang SC',Arial,sans-serif;line-height:1.5;">
-        长按下方报价图保存到相册；保存后点“返回报价系统”。
-        <button id="backQuoteApp" style="float:right;border:0;border-radius:8px;background:#fff;color:#111;padding:6px 10px;font-weight:700;">返回报价系统</button>
-      </div>
-      <img src="${dataUrl}" alt="${safeName}" style="display:block;width:100%;height:auto;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;touch-action:auto;" />
-    </div>`;
-    const back=document.getElementById("backQuoteApp");
-    if(back){
-      back.onclick=()=>{
-        document.body.innerHTML=oldHtml;
-        document.body.style.background=oldBg;
-        try{ init(); }catch(e){ location.reload(); }
-      };
-    }
-  }
-
-  function openImagePage(dataUrl){
-    const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><title>${safeName}</title><style>body{margin:0;background:#111;min-height:100vh}img{width:100%;height:auto;display:block;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;touch-action:auto;}p{position:sticky;top:0;margin:0;padding:10px;background:rgba(0,0,0,.82);color:#fff;font:14px sans-serif;text-align:center;z-index:2}</style></head><body><p>长按图片保存到相册</p><img src="${dataUrl}" alt="${safeName}"></body></html>`;
-    const w=window.open("about:blank","_blank");
-    if(w){
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-    }else{
-      enterFullSavePage(dataUrl);
-    }
+  function openRealPngFallback(dataUrl){
+    // 兜底，不作为手机主方案
+    const w=window.open(dataUrl,"_blank");
+    if(!w) location.href=dataUrl;
   }
 
   try{
@@ -903,30 +906,35 @@ async function saveCanvasImage(canvas, filename){
     img.style.webkitUserSelect="auto";
     img.style.userSelect="auto";
     img.style.webkitTouchCallout="default";
-    img.setAttribute("draggable","true");
 
     modal.classList.add("show");
 
-    if(serverBtn){
-      serverBtn.style.display="inline-flex";
-      serverBtn.onclick=()=>postToMobileSavePage(dataUrl);
-    }
-    if(fullBtn){
-      fullBtn.style.display="inline-flex";
-      fullBtn.onclick=()=>enterFullSavePage(dataUrl);
-    }
-
     if(isMobile){
-      if(tip) tip.textContent="手机端：请点“手机保存页”，进入后长按图片保存。这个方式比直接下载更稳定。";
-      down.textContent="手机保存页";
+      if(tip) tip.textContent="手机最终方案：点击“最终手机保存页”，进入后直接用手机系统截图保存。这不依赖浏览器下载，所以不会再出现下载失败。";
+
+      if(finalBtn){
+        finalBtn.style.display="inline-flex";
+        finalBtn.onclick=()=>openFinalMobileSavePage();
+      }
+      down.textContent="最终手机保存页";
       down.removeAttribute("download");
       down.href="#";
-      down.target="";
-      down.rel="";
-      down.onclick=(e)=>{e.preventDefault();postToMobileSavePage(dataUrl)};
+      down.onclick=(e)=>{e.preventDefault();openFinalMobileSavePage()};
 
-      openBtn.textContent="打开大图长按保存";
-      openBtn.onclick=()=>openImagePage(dataUrl);
+      // 其他按钮只做备用
+      if(realPngBtn){
+        realPngBtn.style.display="inline-flex";
+        realPngBtn.onclick=()=>openRealPngFallback(dataUrl);
+      }
+      if(serverBtn){
+        serverBtn.style.display="none";
+      }
+      if(fullBtn){
+        fullBtn.style.display="none";
+      }
+
+      openBtn.textContent="备用：打开图片";
+      openBtn.onclick=()=>openRealPngFallback(dataUrl);
 
       if(blob && typeof File!=="undefined" && navigator.share){
         try{
@@ -936,7 +944,7 @@ async function saveCanvasImage(canvas, filename){
             shareBtn.style.display="inline-flex";
             shareBtn.onclick=async()=>{
               try{ await navigator.share({files:[file],title:safeName,text:"报价单图片"}); }
-              catch(err){ if(!err || err.name!=="AbortError") postToMobileSavePage(dataUrl); }
+              catch(err){ if(!err || err.name!=="AbortError") openFinalMobileSavePage(); }
             };
           }else{
             shareBtn.style.display="none";
@@ -948,56 +956,45 @@ async function saveCanvasImage(canvas, filename){
         shareBtn.style.display="none";
       }
 
-      if(blob && navigator.clipboard && window.ClipboardItem){
-        copyBtn.style.display="inline-flex";
-        copyBtn.onclick=async()=>{
-          try{
-            await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
-            alert("已复制图片，可以去微信/聊天框粘贴。");
-          }catch(e){
-            alert("当前浏览器不支持复制图片，请使用“手机保存页”。");
-          }
-        };
-      }else{
-        copyBtn.style.display="none";
-      }
+      copyBtn.style.display="none";
     }else{
       const blobUrl = blob ? URL.createObjectURL(blob) : dataUrl;
-      if(tip) tip.textContent="电脑端：点击“下载图片”。如果没有自动下载，可点击“打开大图”。";
+      if(tip) tip.textContent="电脑端：点击“下载图片”。";
       down.textContent="下载图片";
       down.href=blobUrl;
       down.download=safeName;
       down.target="";
       down.rel="";
       down.onclick=null;
-      shareBtn.style.display="none";
-      copyBtn.style.display="none";
+      if(finalBtn) finalBtn.style.display="none";
+      if(realPngBtn) realPngBtn.style.display="none";
       if(serverBtn) serverBtn.style.display="none";
       if(fullBtn) fullBtn.style.display="none";
+      shareBtn.style.display="none";
+      copyBtn.style.display="none";
       openBtn.textContent="打开大图";
-      openBtn.onclick=()=>openImagePage(dataUrl);
+      openBtn.onclick=()=>openRealPngFallback(dataUrl);
       setTimeout(()=>{try{down.click()}catch(e){}},80);
     }
   }catch(err){
-    try{
-      const dataUrl = canvas.toDataURL("image/png");
-      img.src=dataUrl;
+    // 即便图片生成失败，手机端仍然可以打开DOM保存页
+    if(isMobile){
       modal.classList.add("show");
-      if(serverBtn){
-        serverBtn.style.display="inline-flex";
-        serverBtn.onclick=()=>postToMobileSavePage(dataUrl);
+      if(tip) tip.textContent="图片生成失败也没关系，请点击“最终手机保存页”，用手机截图保存。";
+      if(finalBtn){
+        finalBtn.style.display="inline-flex";
+        finalBtn.onclick=()=>openFinalMobileSavePage();
       }
-      if(fullBtn){
-        fullBtn.style.display="inline-flex";
-        fullBtn.onclick=()=>enterFullSavePage(dataUrl);
-      }
-      down.textContent=isMobile?"手机保存页":"下载图片";
+      down.textContent="最终手机保存页";
       down.href="#";
-      down.onclick=(e)=>{e.preventDefault();postToMobileSavePage(dataUrl)};
-      openBtn.onclick=()=>openImagePage(dataUrl);
+      down.onclick=(e)=>{e.preventDefault();openFinalMobileSavePage()};
+      openBtn.onclick=()=>openFinalMobileSavePage();
       shareBtn.style.display="none";
       copyBtn.style.display="none";
-    }catch(e){
+      if(realPngBtn) realPngBtn.style.display="none";
+      if(serverBtn) serverBtn.style.display="none";
+      if(fullBtn) fullBtn.style.display="none";
+    }else{
       alert("生成报价单图片失败："+(err.message||err));
     }
   }
@@ -1740,6 +1737,11 @@ async function deleteAgent(id){
 
 
 function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(["courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2"].includes(id)){lastChangedMultiWeek=id}if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){lastChangedMultiWeek="";updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
+  const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
+  if(isMobile){
+    openFinalMobileSavePage();
+    return;
+  }
   const btn=$("downloadImage");
   const old=btn.textContent;
   try{

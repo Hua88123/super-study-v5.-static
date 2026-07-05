@@ -942,3 +942,38 @@ th,td{padding:5px 5px !important; line-height:1.25 !important; vertical-align:to
     max-width: none !important;
   }
 }
+
+
+/* V13 手机端真实 PNG 保存，不改报价图模板 */
+#imagePreviewRealPng {
+  background:#e4251a;
+  color:#fff;
+  border:1px solid #e4251a;
+  box-shadow:none;
+}
+#imagePreviewServer {
+  background:#0639a6;
+  color:#fff;
+  border:1px solid #0639a6;
+  box-shadow:none;
+}
+.image-preview-scroll img {
+  -webkit-touch-callout: default !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  pointer-events: auto !important;
+}
+
+
+/* V14 最终方案：手机端不再下载，改为同模板截图保存页 */
+#imagePreviewFinal {
+  background:#e4251a;
+  color:#fff;
+  border:1px solid #e4251a;
+  box-shadow:none;
+}
+@media (max-width:720px){
+  #downloadImage::after{
+    content:"";
+  }
+}
