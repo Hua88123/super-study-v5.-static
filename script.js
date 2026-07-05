@@ -525,6 +525,7 @@ function buildUsdRows(c,s){
 }
 function renderQuoteSheet(){
   let c=calc(),s=c.school,set=data.settings;
+  const schoolTitle=[s.name,s.campus].filter(Boolean).join("-");
   let usdRows=buildUsdRows(c,s);
   let phpRows=c.localItems.map(it=>[
     it.name,
@@ -540,14 +541,14 @@ function renderQuoteSheet(){
     <div class="sheet-head">
       <img class="sheet-logo" src="${set.brandLogo}"/>
       <div class="sheet-title">
-        <h2>${s.name} ${s.campus}</h2>
+        <h2>${schoolTitle||s.name}</h2>
         <h3>游学报价单（${c.weeks}周）</h3>
         <span class="slogan">${quoteSlogan()}</span>
       </div>
     </div>
     <div class="info-grid">
-      ${info("学校",s.name,s.campus)}
-      ${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜${c.endDate} 周六毕业`)}
+      ${info("学校",schoolTitle||s.name,s.campus||"")}
+      ${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜<br>${c.endDate} 周六毕业`)}
       ${info("课程",c.courseName||"-","报名周数已列明")}
       ${info("房型",c.roomName||"-","住宿按所选房型")}
       ${info("注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,"")}
@@ -882,9 +883,9 @@ async function drawNativeQuoteCanvas(){
   ctx.fillStyle=grad;canvasRoundRect(ctx,margin,20,W-margin*2,150,22,true,false);
   if(logo)ctx.drawImage(logo,margin+18,38,112,112);
   ctx.fillStyle="#0639a6";ctx.font="bold 38px Arial, sans-serif";
-  drawWrap(ctx,`${s.name} ${s.campus}`,margin+150,68,760,46,1);
-  ctx.font="bold 28px Arial, sans-serif";ctx.fillStyle="#111b63";
-  ctx.fillText(`游学报价单（${c.weeks}周）`,margin+150,114);
+  drawWrap(ctx,`${s.name}${s.campus?`-${s.campus}`:""}`,margin+150,68,760,46,1);
+  ctx.font="bold 30px Arial, sans-serif";ctx.fillStyle="#111b63";
+  ctx.fillText(`游学报价单（${c.weeks}周）`,margin+150,116);
   ctx.fillStyle="#0798e8";canvasRoundRect(ctx,margin+150,128,470,34,17,true,false);
   ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(quoteSlogan(),margin+176,151);
 
@@ -897,7 +898,7 @@ async function drawNativeQuoteCanvas(){
   let y=190;
   const infoW=(W-margin*2-4*10)/5;
   [
-    ["学校",s.name,s.campus],
+    ["学校",`${s.name}${s.campus?`-${s.campus}`:""}`,s.campus],
     ["时间",`${c.weeks}周`,`${c.startDate} 入学｜${c.endDate} 毕业`],
     ["课程",c.courseName||"-","报名周数下方列明"],
     ["房型",c.roomName||"-","住宿按所选房型"],

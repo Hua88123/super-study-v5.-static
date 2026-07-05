@@ -1,0 +1,45 @@
+Vercel 环境变量设置说明（V9多中介白标授权版）
+
+必填：
+
+1.
+Name: SUPABASE_URL
+Value: https://你的项目ID.supabase.co
+
+2.
+Name: SUPABASE_SERVICE_ROLE_KEY
+Value: Supabase 的 service_role key
+
+建议添加：
+
+3.
+Name: ADMIN_PASSWORD
+Value: 你的管理员密码
+
+说明：
+V9 的员工授权、中介授权、云端保存都会用 ADMIN_PASSWORD 校验管理员身份。
+如果不设置，默认管理员密码是 SuperStudy888。
+
+可选：
+
+4.
+Name: SUPABASE_TABLE
+Value: super_study_data
+
+5.
+Name: SUPABASE_ROW
+Value: main
+
+6.
+Name: SUPABASE_EMPLOYEE_TABLE
+Value: super_study_employees
+
+7.
+Name: SUPABASE_AGENT_TABLE
+Value: super_study_agents
+
+8.
+Name: SUPABASE_AGENT_DEVICE_TABLE
+Value: super_study_agent_devices
+
+设置或修改后必须 Redeploy。
