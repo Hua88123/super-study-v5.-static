@@ -749,6 +749,15 @@ function wrapCanvasText(ctx,text,maxWidth,maxLines=99){
   });
   return out.slice(0,maxLines);
 }
+
+function fitSingleLine(ctx,text,maxWidth){
+  let s=String(text||"");
+  if(ctx.measureText(s).width<=maxWidth) return s;
+  while(s.length>0 && ctx.measureText(s+"...").width>maxWidth){
+    s=s.slice(0,-1);
+  }
+  return s+"...";
+}
 function drawWrap(ctx,text,x,y,maxWidth,lineHeight,maxLines=99){
   const lines=wrapCanvasText(ctx,text,maxWidth,maxLines);
   lines.forEach((line,i)=>ctx.fillText(line,x,y+i*lineHeight));
@@ -782,16 +791,17 @@ function drawNativeWatermark(ctx,W,H,logo,txt){
   }
   ctx.restore();
 }
-function rowHeightByText(ctx,row,colWidths){
+function rowHeightByText(ctx,row,colWidths,opt={}){
   let max=38;
   row.forEach((cell,i)=>{
-    const lines=wrapCanvasText(ctx,String(cell||""),colWidths[i]-14,3).length||1;
+    const single = (opt.singleLineCols||[]).includes(i);
+    const lines = single ? 1 : (wrapCanvasText(ctx,String(cell||""),colWidths[i]-14,3).length||1);
     max=Math.max(max,18+lines*17);
   });
   return max;
 }
-function drawNativeTable(ctx,headers,rows,x,y,w){
-  const col=[w*.22,w*.40,w*.20,w*.18];
+function drawNativeTable(ctx,headers,rows,x,y,w,opt={}){
+  const col=opt.colWidths || [w*.22,w*.40,w*.20,w*.18];
   ctx.font="bold 14px Arial, sans-serif";
   let h=36, cx=x;
   ctx.fillStyle="#f5f8ff";ctx.fillRect(x,y,w,h);
@@ -803,15 +813,21 @@ function drawNativeTable(ctx,headers,rows,x,y,w){
   y+=h;
   rows.forEach((row,ri)=>{
     ctx.font="14px Arial, sans-serif";
-    const rh=rowHeightByText(ctx,row,col);
+    const rh=rowHeightByText(ctx,row,col,opt);
     cx=x;
     ctx.fillStyle=ri%2?"#fbfdff":"#fff";ctx.fillRect(x,y,w,rh);
     row.forEach((cell,i)=>{
       ctx.strokeStyle="#dbe7ff";ctx.strokeRect(cx,y,col[i],rh);
+      const single = (opt.singleLineCols||[]).includes(i);
       ctx.fillStyle=i===2?"#0639a6":"#17214d";
-      ctx.font=i===2?"bold 14px Arial, sans-serif":"14px Arial, sans-serif";
-      const lines=wrapCanvasText(ctx,String(cell||""),col[i]-14,3);
-      lines.forEach((line,li)=>ctx.fillText(line,cx+7,y+20+li*17));
+      ctx.font=i===2?"bold 14px Arial, sans-serif":((opt.smallCols||[]).includes(i)?"12px Arial, sans-serif":"14px Arial, sans-serif");
+      if(single){
+        const line=fitSingleLine(ctx,String(cell||""),col[i]-14);
+        ctx.fillText(line,cx+7,y+20);
+      }else{
+        const lines=wrapCanvasText(ctx,String(cell||""),col[i]-14,3);
+        lines.forEach((line,li)=>ctx.fillText(line,cx+7,y+20+li*17));
+      }
       cx+=col[i];
     });
     y+=rh;
@@ -820,7 +836,7 @@ function drawNativeTable(ctx,headers,rows,x,y,w){
 }
 async function drawNativeQuoteCanvas(){
   const c=calc(), s=c.school, set=data.settings;
-  const W=1000, margin=28;
+  const W=920, margin=24;
   const logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");
   const usdRows=buildUsdRows(c,s);
   const phpRows=c.localItems.map(it=>[
@@ -832,8 +848,10 @@ async function drawNativeQuoteCanvas(){
 
   const temp=document.createElement("canvas").getContext("2d");
   temp.font="14px Arial, sans-serif";
-  let usdH=36+usdRows.reduce((a,r)=>a+rowHeightByText(temp,r,[455*.22,455*.40,455*.20,455*.18]),0)+70;
-  let phpH=36+phpRows.reduce((a,r)=>a+rowHeightByText(temp,r,[455*.22,455*.40,455*.20,455*.18]),0)+70;
+  const usdCols=[455*.22,455*.40,455*.20,455*.18];
+  const phpCols=[455*.36,455*.24,455*.20,455*.20];
+  let usdH=36+usdRows.reduce((a,r)=>a+rowHeightByText(temp,r,usdCols),0)+70;
+  let phpH=36+phpRows.reduce((a,r)=>a+rowHeightByText(temp,r,phpCols,{singleLineCols:[0],smallCols:[0]}),0)+70;
   let panelH=Math.max(420,usdH,phpH);
 
   const promoTextLines=Math.max(
@@ -850,7 +868,7 @@ async function drawNativeQuoteCanvas(){
 
   const H=190+120+extraH+promoH+panelH+210+110+60;
   const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const scale=isMobile?1.35:2;
+  const scale=isMobile?1.2:1.8;
   const canvas=document.createElement("canvas");
   canvas.width=Math.round(W*scale);
   canvas.height=Math.round(H*scale);
@@ -864,9 +882,9 @@ async function drawNativeQuoteCanvas(){
   grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.65,"#fff");grad.addColorStop(1,"#fff3c0");
   ctx.fillStyle=grad;canvasRoundRect(ctx,margin,20,W-margin*2,150,22,true,false);
   if(logo)ctx.drawImage(logo,margin+18,38,112,112);
-  ctx.fillStyle="#0639a6";ctx.font="bold 42px Arial, sans-serif";
+  ctx.fillStyle="#0639a6";ctx.font="bold 38px Arial, sans-serif";
   drawWrap(ctx,`${s.name} ${s.campus}`,margin+150,68,760,46,1);
-  ctx.font="bold 32px Arial, sans-serif";ctx.fillStyle="#111b63";
+  ctx.font="bold 28px Arial, sans-serif";ctx.fillStyle="#111b63";
   ctx.fillText(`游学报价单（${c.weeks}周）`,margin+150,114);
   ctx.fillStyle="#0798e8";canvasRoundRect(ctx,margin+150,128,470,34,17,true,false);
   ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(quoteSlogan(),margin+176,151);
@@ -923,17 +941,17 @@ async function drawNativeQuoteCanvas(){
   y+=promoH+16;
 
   const panelW=(W-margin*2-14)/2;
-  function drawPanel(x,y,title,green,rows,totalText,totalAmount){
+  function drawPanel(x,y,title,green,rows,totalText,totalAmount,opt={}){
     ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y,panelW,panelH,20,true,true);
     ctx.fillStyle=green?"#0b7a48":"#0639a6";canvasRoundRect(ctx,x,y,panelW,50,20,true,false);
     ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(title,x+16,y+31);
-    let endY=drawNativeTable(ctx,["项目","说明","金额","备注"],rows,x+12,y+62,panelW-24);
+    let endY=drawNativeTable(ctx,["项目","说明","金额","备注"],rows,x+12,y+62,panelW-24,opt);
     ctx.fillStyle="#fff";ctx.fillRect(x+12,y+panelH-62,panelW-24,46);
     ctx.fillStyle=green?"#0b7a48":"#0639a6";ctx.font="bold 22px Arial, sans-serif";ctx.fillText(totalText,x+24,y+panelH-31);
     ctx.fillStyle=green?"#0b7a48":"#e4251a";ctx.font="bold 26px Arial, sans-serif";ctx.fillText(totalAmount,x+164,y+panelH-31);
   }
-  drawPanel(margin,y,"费用一：学费 & 住宿费（美元）",false,usdRows,"费用一合计：",`${Math.round(c.totalUsd).toLocaleString()} 美元`);
-  drawPanel(margin+panelW+14,y,"费用二：到校支付费用（披索）",true,phpRows,"费用二合计：",`${Math.round(c.localPeso).toLocaleString()} PHP`);
+  drawPanel(margin,y,"费用一：学费 & 住宿费（美元）",false,usdRows,"费用一合计：",`${Math.round(c.totalUsd).toLocaleString()} 美元`,{colWidths:usdCols});
+  drawPanel(margin+panelW+14,y,"费用二：到校支付费用（披索）",true,phpRows,"费用二合计：",`${Math.round(c.localPeso).toLocaleString()} PHP`,{colWidths:phpCols,singleLineCols:[0],smallCols:[0]});
   y+=panelH+16;
 
   ctx.fillStyle="#fbfdff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,margin,y,W-margin*2,200,22,true,true);
