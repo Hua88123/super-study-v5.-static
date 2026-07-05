@@ -584,9 +584,141 @@ async function saveCanvasImage(canvas, filename){
   }
 }
 
-async function downloadImage(){let c=calc(),set=data.settings,s=c.school,canvas=document.createElement("canvas"),W=1080,H=1850;canvas.width=W*2;canvas.height=H*2;let ctx=canvas.getContext("2d");ctx.scale(2,2);ctx.fillStyle="#fff";ctx.fillRect(0,0,W,H);let logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");let grad=ctx.createLinearGradient(0,0,W,180);grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.6,"#fff");grad.addColorStop(1,"#fff3c0");ctx.fillStyle=grad;ctx.fillRect(0,0,W,180);if(logo)ctx.drawImage(logo,32,20,130,130);ctx.fillStyle="#0639a6";ctx.font="bold 52px sans-serif";ctx.fillText(`${s.name} ${s.campus}`,180,65);ctx.font="bold 40px sans-serif";ctx.fillText(`游学报价单（${c.weeks}周）`,180,120);ctx.fillStyle="#0798e8";rr(ctx,180,138,520,40,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText(quoteSlogan(),220,166);[["学校",s.name,s.campus],["时间",`${c.weeks}周`,`${c.startDate} 周日入学\n${c.endDate} 周六毕业`],["课程",c.courseName||"-",c.courseDetailText||""],["房型",c.roomName||"-",c.roomDetailText||"住宿按所选房型"],["注册金",`${c.originalRegistrationFee}美元/人`,""]].forEach((it,i)=>{let x=32+i*206,y=205;rr(ctx,x,y,196,126,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.font="bold 22px sans-serif";ctx.fillText(it[0],x+16,y+32);ctx.fillStyle="#111b63";ctx.font="bold 20px sans-serif";t(ctx,it[1],x+16,y+70,164,24,2);ctx.fillStyle="#667395";ctx.font="14px sans-serif";
-let subText=String(it[2]||"").split("\n");
-subText.forEach((line,li)=>t(ctx,line,x+16,y+98+li*18,164,16,1))});let promoY=350;rr(ctx,32,promoY,480,96,18);ctx.fillStyle="#fff5f5";ctx.fill();ctx.strokeStyle="#ffd7d7";ctx.stroke();ctx.fillStyle="#e4251a";ctx.font="bold 24px sans-serif";ctx.fillText(s.discounts.schoolPromoTitle,56,promoY+34);ctx.fillStyle="#17214d";ctx.font="17px sans-serif";t(ctx,s.discounts.schoolPromoText,56,promoY+64,430,20,2);rr(ctx,534,promoY,514,96,18);ctx.fillStyle="#f7f9ff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.font="bold 24px sans-serif";ctx.fillText(set.agencyAdvantageTitle,558,promoY+34);ctx.font="18px sans-serif";ctx.fillText(`✓ ${set.agencyAdvantageLine1}`,558,promoY+65);ctx.fillText(`✓ ${set.agencyAdvantageLine2}`,558,promoY+90);let px=32,py=470,pw=500,ph=760;rr(ctx,px,py,pw,ph,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";rr(ctx,px,py,pw,54,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("费用一：学费 & 住宿费（美元）",px+20,py+35);let usd=buildUsdRows(c,s);drawRows(ctx,["项目","说明","金额","备注"],usd,44,py+70,pw-24,48);ctx.fillStyle="#fff";ctx.fillRect(48,py+ph-70,pw-32,52);ctx.fillStyle="#0639a6";ctx.font="bold 27px sans-serif";ctx.fillText("费用一合计：",64,py+ph-35);ctx.fillStyle="#e4251a";ctx.font="bold 36px sans-serif";ctx.fillText(`${Math.round(c.totalUsd).toLocaleString()} 美元`,250,py+ph-35);let gx=548;rr(ctx,gx,py,pw,ph,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0b7a48";rr(ctx,gx,py,pw,54,20);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 23px sans-serif";ctx.fillText("费用二：到校支付费用（披索）",gx+20,py+35);let php=c.localItems.slice(0,10).map(it=>[it.name.replace("（超过59天必须办理）",""),it.perWeek?`${it.amount}PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),Math.round(it.total??it.amount).toLocaleString(),it.excluded?"不含合计":(it.note||"")]);drawRows(ctx,["项目","说明","金额","备注"],php,560,py+70,pw-24,58);ctx.fillStyle="#fff";ctx.fillRect(564,py+ph-70,pw-32,52);ctx.fillStyle="#0b7a48";ctx.font="bold 27px sans-serif";ctx.fillText("费用二合计：",580,py+ph-35);ctx.font="bold 33px sans-serif";ctx.fillText(`${Math.round(c.localPeso).toLocaleString()} PHP`,770,py+ph-35);let sy=1286;rr(ctx,32,sy,1016,286,24);ctx.fillStyle="#fbfdff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle="#0639a6";ctx.textAlign="center";ctx.font="bold 34px sans-serif";ctx.fillText("本次游学总计（以实际汇率为准）",W/2,sy+48);ctx.textAlign="left";let by=sy+78;[["美元部分",`${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}`,rmb(c.tuitionRmb),"#0639a6"],["披索部分",`${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}`,rmb(c.localRmb),"#0b7a48"]].forEach((b,i)=>{let x=60+i*386;rr(ctx,x,by,300,112,20);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();ctx.fillStyle=b[3];ctx.font="bold 20px sans-serif";ctx.fillText(b[0],x+26,by+38);ctx.fillStyle="#17214d";ctx.font="15px sans-serif";ctx.fillText(b[1],x+26,by+66);ctx.fillStyle=b[3];ctx.font="bold 22px sans-serif";ctx.fillText(b[2],x+26,by+94)});ctx.fillStyle="#0639a6";ctx.font="bold 44px sans-serif";ctx.fillText("+",384,by+70);ctx.fillText("≈",800,by+70);ctx.fillStyle="#e4251a";ctx.font="bold 54px sans-serif";ctx.fillText(`${Math.round(c.totalRmb).toLocaleString()}`,860,by+66);ctx.font="bold 24px sans-serif";ctx.fillText("人民币",900,by+100);rr(ctx,32,1620,1016,120,20);ctx.fillStyle="#fff7e8";ctx.fill();ctx.strokeStyle="#ffd98c";ctx.stroke();ctx.fillStyle="#17214d";ctx.font="bold 20px sans-serif";ctx.fillText(`选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务`,58,1662);ctx.font="17px sans-serif";ctx.fillText("备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。",58,1704);let wmText=set.watermarkText||set.brandName||"超能游学";ctx.save();ctx.globalAlpha=.075;ctx.translate(W/2,H/2);ctx.rotate(-Math.PI/6);for(let yy=-2200;yy<=2200;yy+=105){for(let xx=-1800;xx<=1800;xx+=180){if(logo){ctx.drawImage(logo,xx,yy-16,28,28)}ctx.fillStyle="#0639a6";ctx.font="bold 20px sans-serif";ctx.fillText(wmText,xx+34,yy+4)}}ctx.restore();await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`)}
+async function downloadImage(){
+  let c=calc(),set=data.settings,s=c.school,canvas=document.createElement("canvas"),W=920,H=1640;
+  canvas.width=W*2;canvas.height=H*2;
+  let ctx=canvas.getContext("2d");
+  ctx.scale(2,2);
+  ctx.fillStyle="#fff";
+  ctx.fillRect(0,0,W,H);
+
+  function mt(txt,x,y,mw,lh,maxLines=3,color=null,font=null){
+    if(color) ctx.fillStyle=color;
+    if(font) ctx.font=font;
+    let lines=[], count=0;
+    String(txt||"").split("\n").forEach(par=>{
+      let current="";
+      for(let ch of String(par)){
+        let test=current+ch;
+        if(ctx.measureText(test).width>mw && current){
+          lines.push(current);
+          current=ch;
+          count++;
+          if(count>=maxLines) break;
+        }else{
+          current=test;
+        }
+      }
+      if(count<maxLines && current){
+        lines.push(current);
+        count++;
+      }
+    });
+    lines.slice(0,maxLines).forEach((line,i)=>ctx.fillText(line,x,y+i*lh));
+  }
+
+  let logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");
+  let grad=ctx.createLinearGradient(0,0,W,160);
+  grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.6,"#fff");grad.addColorStop(1,"#fff3c0");
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,160);
+  if(logo)ctx.drawImage(logo,24,18,110,110);
+
+  ctx.fillStyle="#0639a6";
+  ctx.font="bold 42px sans-serif";
+  ctx.fillText(`${s.name} ${s.campus}`,154,58);
+  ctx.font="bold 32px sans-serif";
+  ctx.fillText(`游学报价单（${c.weeks}周）`,154,104);
+  ctx.fillStyle="#0798e8";
+  rr(ctx,154,118,430,34,17);ctx.fill();
+  ctx.fillStyle="#fff";
+  ctx.font="bold 19px sans-serif";
+  ctx.fillText(quoteSlogan(),182,140);
+
+  function infoCard(x,y,w,h,title,main,sub,mainLines=3,subLines=4){
+    rr(ctx,x,y,w,h,16);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
+    ctx.fillStyle="#0639a6";ctx.font="bold 20px sans-serif";ctx.fillText(title,x+14,y+28);
+    ctx.fillStyle="#111b63";ctx.font="bold 17px sans-serif";mt(main,x+14,y+56,w-28,20,mainLines);
+    if(sub){
+      ctx.fillStyle="#667395";ctx.font="13px sans-serif";mt(sub,x+14,y+h-58,w-28,15,subLines);
+    }
+  }
+
+  const courseWeeksText = c.courseDetails.map(d=>`${d.item?.name||"-"} ${d.weeks}周`).join("\n");
+  const courseLessonText = "具体课程课时：\n" + c.courseDetails.map(d=>`${d.item?.name||"-"}：${courseLesson(d.item)||"以学校安排为准"}`).join("\n");
+  const roomWeeksText = c.roomDetails.map(d=>`${d.item?.name||"-"} ${d.weeks}周`).join("\n");
+
+  infoCard(24,176,278,100,"学校",s.name,s.campus,2,2);
+  infoCard(320,176,278,100,"时间",`${c.weeks}周`,`${c.startDate} 周日入学\n${c.endDate} 周六毕业`,2,2);
+  infoCard(616,176,280,100,"注册金",`${c.originalRegistrationFee}美元/人`,"",2,1);
+
+  infoCard(24,292,430,188,"课程",courseWeeksText,courseLessonText,4,6);
+  infoCard(466,292,430,188,"房型",roomWeeksText,"住宿按所选房型",4,2);
+
+  let promoY=496;
+  rr(ctx,24,promoY,430,118,16);ctx.fillStyle="#fff5f5";ctx.fill();ctx.strokeStyle="#ffd7d7";ctx.stroke();
+  ctx.fillStyle="#e4251a";ctx.font="bold 21px sans-serif";ctx.fillText(s.discounts.schoolPromoTitle,42,promoY+28);
+  ctx.fillStyle="#17214d";ctx.font="15px sans-serif";mt(s.discounts.schoolPromoText,42,promoY+54,392,18,4);
+
+  rr(ctx,466,promoY,430,118,16);ctx.fillStyle="#f7f9ff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
+  ctx.fillStyle="#0639a6";ctx.font="bold 21px sans-serif";ctx.fillText(set.agencyAdvantageTitle,484,promoY+28);
+  ctx.fillStyle="#17214d";ctx.font="15px sans-serif";mt(`✓ ${set.agencyAdvantageLine1}\n✓ ${set.agencyAdvantageLine2}`,484,promoY+54,392,18,4);
+
+  let boxY=632, leftX=24, rightX=466, boxW=430, boxH=600;
+  rr(ctx,leftX,boxY,boxW,boxH,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
+  ctx.fillStyle="#0639a6";rr(ctx,leftX,boxY,boxW,48,18);ctx.fill();
+  ctx.fillStyle="#fff";ctx.font="bold 20px sans-serif";ctx.fillText("费用一：学费 & 住宿费（美元）",leftX+18,boxY+31);
+  let usd=buildUsdRows(c,s);
+  drawRows(ctx,["项目","说明","金额","备注"],usd,leftX+12,boxY+58,boxW-24,42);
+  ctx.fillStyle="#fff";ctx.fillRect(leftX+12,boxY+boxH-56,boxW-24,42);
+  ctx.fillStyle="#0639a6";ctx.font="bold 22px sans-serif";ctx.fillText("费用一合计：",leftX+26,boxY+boxH-28);
+  ctx.fillStyle="#e4251a";ctx.font="bold 27px sans-serif";ctx.fillText(`${Math.round(c.totalUsd).toLocaleString()} 美元`,leftX+162,boxY+boxH-28);
+
+  rr(ctx,rightX,boxY,boxW,boxH,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
+  ctx.fillStyle="#0b7a48";rr(ctx,rightX,boxY,boxW,48,18);ctx.fill();
+  ctx.fillStyle="#fff";ctx.font="bold 20px sans-serif";ctx.fillText("费用二：到校支付费用（披索）",rightX+18,boxY+31);
+  let php=c.localItems.slice(0,10).map(it=>[
+    it.name.replace("（超过59天必须办理）",""),
+    it.perWeek?`${it.amount}PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),
+    Math.round(it.total??it.amount).toLocaleString(),
+    it.excluded?"不含合计":(it.note||"")
+  ]);
+  drawRows(ctx,["项目","说明","金额","备注"],php,rightX+12,boxY+58,boxW-24,48);
+  ctx.fillStyle="#fff";ctx.fillRect(rightX+12,boxY+boxH-56,boxW-24,42);
+  ctx.fillStyle="#0b7a48";ctx.font="bold 22px sans-serif";ctx.fillText("费用二合计：",rightX+26,boxY+boxH-28);
+  ctx.font="bold 25px sans-serif";ctx.fillText(`${Math.round(c.localPeso).toLocaleString()} PHP`,rightX+168,boxY+boxH-28);
+
+  let sumY=1248;
+  rr(ctx,24,sumY,872,206,20);ctx.fillStyle="#fbfdff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
+  ctx.fillStyle="#0639a6";ctx.textAlign="center";ctx.font="bold 28px sans-serif";
+  ctx.fillText("本次游学总计（以实际汇率为准）",W/2,sumY+40);ctx.textAlign="left";
+  let by=sumY+62;
+  [["美元部分",`${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}`,rmb(c.tuitionRmb),"#0639a6"],["披索部分",`${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}`,rmb(c.localRmb),"#0b7a48"]].forEach((b,i)=>{
+    let x=48+i*318;
+    rr(ctx,x,by,242,92,16);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
+    ctx.fillStyle=b[3];ctx.font="bold 17px sans-serif";ctx.fillText(b[0],x+18,by+28);
+    ctx.fillStyle="#17214d";ctx.font="13px sans-serif";mt(b[1],x+18,by+50,206,15,2);
+    ctx.fillStyle=b[3];ctx.font="bold 18px sans-serif";ctx.fillText(b[2],x+18,by+76);
+  });
+  ctx.fillStyle="#0639a6";ctx.font="bold 34px sans-serif";ctx.fillText("+",296,by+56);ctx.fillText("≈",627,by+56);
+  ctx.fillStyle="#e4251a";ctx.font="bold 42px sans-serif";ctx.fillText(`${Math.round(c.totalRmb).toLocaleString()}`,682,by+54);
+  ctx.font="bold 18px sans-serif";ctx.fillText("人民币",724,by+82);
+
+  rr(ctx,24,1472,872,86,18);ctx.fillStyle="#fff7e8";ctx.fill();ctx.strokeStyle="#ffd98c";ctx.stroke();
+  ctx.fillStyle="#17214d";ctx.font="bold 17px sans-serif";ctx.fillText(`选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务`,44,1500);
+  ctx.font="15px sans-serif";mt("备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。",44,1526,820,18,2);
+
+  let wmText=set.watermarkText||set.brandName||"超能游学";
+  ctx.save();ctx.globalAlpha=.075;ctx.translate(W/2,H/2);ctx.rotate(-Math.PI/6);
+  for(let yy=-2200;yy<=2200;yy+=92){
+    for(let xx=-1800;xx<=1800;xx+=165){
+      if(logo){ctx.drawImage(logo,xx,yy-14,24,24)}
+      ctx.fillStyle="#0639a6";ctx.font="bold 17px sans-serif";ctx.fillText(wmText,xx+28,yy+4)
+    }
+  }
+  ctx.restore();
+
+  await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`)
+}
 function renderRecords(){$("recordsList").innerHTML=data.records.length?data.records.map((r,i)=>`<div class="list-item"><div><b>${r.title}</b><br/><span class="muted">${r.createdAt}</span></div><div class="list-actions"><button onclick="navigator.clipboard.writeText(data.records[${i}].text)">复制</button><button class="danger" onclick="deleteRecord(${i})">删除</button></div></div>`).join(""):`<p class="muted">暂无报价记录</p>`}function deleteRecord(i){data.records.splice(i,1);saveData();renderRecords()}
 function renderSchoolList(){$("schoolList").innerHTML=data.schools.map(s=>`<div class="list-item"><div><b>${s.name} ${s.campus}</b><br/><span class="muted">${s.courses.length}个课程 / ${s.rooms.length}个房型</span></div><div class="list-actions"><button onclick="editSchool('${s.id}')">编辑</button><button class="danger" onclick="removeSchool('${s.id}')">删除</button></div></div>`).join("")}function editSchool(id){editingSchoolId=id;renderSchoolEditor();renderFeeEditor()}function removeSchool(id){if(data.schools.length<=1)return alert("至少保留一个学校");data.schools=data.schools.filter(s=>s.id!==id);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;saveData();refreshAll()}
 function field(label,id,value,type="text",ph=""){return `<label>${label}<input id="${id}" type="${type}" step="0.01" value="${html(value)}" placeholder="${ph}"/></label>`}function renderSchoolEditor(){let s=editingSchool();$("schoolEditor").innerHTML=`<div class="editor-grid">${field("学校名称","edName",s.name)}${field("校区","edCampus",s.campus)}${field("注册费","edReg",s.discounts.registrationFee,"number")}${field("淡季优惠/4周","edLow",s.discounts.lowSeasonDiscountPer4w,"number","未满4周不享受；6周只享受1个4周；8周享受2个4周")}${field("淡季优惠/1周","edLow1w",s.discounts.lowSeasonDiscountPer1w||0,"number","按实际周数计算，例如37.5美元/周")}<label>淡季优惠计算方式<select id="edLowMode"><option value="per4" ${(s.discounts.lowSeasonDiscountMode||"per4")==="per4"?"selected":""}>按4周计算</option><option value="per1" ${s.discounts.lowSeasonDiscountMode==="per1"?"selected":""}>按1周计算</option></select></label>${field("学校淡季折扣比例","edSchoolRate",s.discounts.schoolLowSeasonDiscountRate,"number","1=无折扣 0.9=9折 0.5=5折")}${field("旺季附加/周","edPeak",s.discounts.peakFeePerWeek,"number")}${field(`${agencyDiscountLabel()}比例`,"edAgency",s.discounts.agencyDiscountRate,"number")}${field(`${agencyWaiverLabel()}金额`,"edWaive",s.discounts.registrationWaiverAmount,"number")}${field("4周长期优惠","edLong4",s.discounts.long4||0,"number")}${field("8周长期优惠","edLong8",s.discounts.long8||0,"number")}${field("12周长期优惠","edLong12",s.discounts.long12,"number")}${field("16周长期优惠","edLong16",s.discounts.long16,"number")}${field("20周长期优惠","edLong20",s.discounts.long20,"number")}${field("24周长期优惠","edLong24",s.discounts.long24,"number")}</div><div class="sub-box"><h3>两个旺季时间段（自动按覆盖周数计算）</h3><p class="muted">系统会按就读期间每一周是否覆盖旺季来计算。比如 6/21 入学 4周，旺季 7/5-8/30，只覆盖2周，则旺季附加=2周 × 旺季附加/周。</p><div class="editor-grid">${field("旺季1开始","edPeak1Start",peakPeriodsOf(s.discounts)[0]?.start||"","date")}${field("旺季1结束","edPeak1End",peakPeriodsOf(s.discounts)[0]?.end||"","date")}${field("旺季2开始","edPeak2Start",peakPeriodsOf(s.discounts)[1]?.start||"","date")}${field("旺季2结束","edPeak2End",peakPeriodsOf(s.discounts)[1]?.end||"","date")}${yesNo("旺季外时间自动恢复优惠","edPeakRestore",!!s.discounts.peakRestoreDiscountsEnabled)}${yesNo("旺季期间仍启用淡季优惠","edPeakAllowLow",!!s.discounts.peakAllowLowSeasonDiscount)}${yesNo("旺季期间仍启用学校淡季折扣","edPeakAllowSchoolRate",!!s.discounts.peakAllowSchoolRateDiscount)}${yesNo("旺季期间仍启用长期优惠","edPeakAllowLong",!!s.discounts.peakAllowLongDiscount)}${yesNo(`旺季期间仍启用${agencyDiscountLabel()}`,"edPeakAllowAgency",!!s.discounts.peakAllowAgencyDiscount)}${yesNo(`旺季期间仍启用${agencyWaiverLabel()}`,"edPeakAllowWaive",!!s.discounts.peakAllowRegistrationWaiver)}</div><p class="muted">大部分学校旺季不叠加任何折扣，这里全部选“不启用”即可；如果学生读到旺季结束之后，想让旺季外时间自动恢复所有默认启用的优惠，开启“旺季外时间自动恢复优惠”。恢复后会按旺季外周数重新计算，不会从入学总周数开始算。</p></div><div class="sub-box"><h3>该学校默认启用的优惠</h3><div class="editor-grid">${yesNo("默认启用淡季优惠","edLowEnabled",s.discounts.lowSeasonEnabled!==false)}${yesNo("淡季优惠前端可手动选择","edLowManual",!!s.discounts.lowSeasonManualSelectable)}${yesNo("默认启用学校淡季折扣","edSchoolRateEnabled",!!s.discounts.schoolLowSeasonRateEnabled)}${yesNo("默认启用旺季附加","edPeakEnabled",!!s.discounts.peakSeasonEnabled)}${yesNo("默认启用长期优惠","edLongEnabled",s.discounts.longDiscountEnabled!==false)}${yesNo(`默认启用${agencyDiscountLabel()}`,"edAgencyEnabled",s.discounts.agencyDiscountEnabled!==false)}${yesNo("默认启用减免注册金","edWaiveEnabled",!!s.discounts.registrationWaiverEnabled)}</div><p class="muted">以后选择这个学校时，系统会自动切换到这些默认优惠。如果开启“淡季优惠前端可手动选择”，自动报价页可以根据学生是否符合优惠手动勾选/取消淡季优惠。</p></div><label>学校优惠标题<input id="edPromoTitle" value="${html(s.discounts.schoolPromoTitle)}"/></label><label>学校优惠说明<textarea id="edPromoText">${html(s.discounts.schoolPromoText)}</textarea></label><div class="sub-box"><h3>价格单智能导入（文本/CSV）</h3><p class="muted">支持 TXT / CSV / 复制出来的价格表文字。图片或PDF需要先用OCR提取文字再粘贴。</p><input type="file" id="priceFile" accept=".txt,.csv,.md,.html,.json,.pdf,image/*"/><textarea id="priceText" placeholder="把学校价格单文字粘贴到这里，例如：\nCG Banilad\nESL加强课 1对1 5节 团课1节 选修2节 750 USD\n3人间宿舍 700 USD"></textarea><div class="btn-row"><button onclick="importPriceText()">识别并导入到当前学校</button></div><div id="importResult" class="muted"></div></div><div class="sub-box"><h3>课程价格（每4周/美元）</h3><div id="courseEdit"></div><button onclick="addCourse()">添加课程</button></div><div class="sub-box"><h3>房型价格（每4周/美元）</h3><div id="roomEdit"></div><button onclick="addRoom()">添加房型</button></div><button onclick="saveSchoolEditor()">保存学校设置</button>`;let pf=$("priceFile");if(pf)pf.addEventListener("change",handlePriceFile);renderCourseRoomEdit()}
