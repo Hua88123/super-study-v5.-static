@@ -645,11 +645,12 @@ function ensureImagePreviewModal(){
       <b>报价单图片已生成</b>
       <button class="secondary" id="imagePreviewClose">关闭</button>
     </div>
-    <p class="muted" id="imagePreviewTip">手机端：点击“保存到手机”；如果浏览器不支持，就点“打开图片后长按保存”。电脑端：点击“下载图片”。</p>
+    <p class="muted" id="imagePreviewTip">手机端：先长按下方预览图保存；不行再点“打开大图长按保存”。电脑端：点击“下载图片”。</p>
     <div class="image-preview-actions">
       <a id="imagePreviewDownload" class="button-link" download="报价单.png">下载图片</a>
-      <button class="secondary" id="imagePreviewShare" style="display:none;">保存到手机</button>
-      <button class="secondary" id="imagePreviewOpen">打开原图</button>
+      <button class="secondary" id="imagePreviewShare" style="display:none;">系统分享/保存</button>
+      <button class="secondary" id="imagePreviewCopy" style="display:none;">复制图片</button>
+      <button class="secondary" id="imagePreviewOpen">打开大图长按保存</button>
     </div>
     <div class="image-preview-scroll"><img id="imagePreviewImg" alt="报价单图片"/></div>
   </div>`;
@@ -739,107 +740,113 @@ async function saveCanvasImage(canvas, filename){
   const down=$("imagePreviewDownload");
   const openBtn=$("imagePreviewOpen");
   const shareBtn=$("imagePreviewShare");
+  const copyBtn=$("imagePreviewCopy");
   const tip=$("imagePreviewTip");
-  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
 
-  const openForSave=(url)=>{
-    if(isMobile){
-      const w=window.open(url,"_blank");
-      if(!w) location.href=url;
+  function canvasToBlob(c){
+    return new Promise(resolve=>c.toBlob(resolve,"image/png",0.92));
+  }
+  function openImagePage(dataUrl){
+    const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title><style>body{margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}img{width:100%;max-width:1200px;height:auto;display:block;background:#fff}p{position:fixed;left:0;right:0;bottom:0;margin:0;padding:10px;background:rgba(0,0,0,.72);color:#fff;font:14px sans-serif;text-align:center}</style></head><body><img src="${dataUrl}" alt="${safeName}"><p>长按图片保存到相册</p></body></html>`;
+    const w=window.open("about:blank","_blank");
+    if(w){
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
     }else{
-      const w=window.open(url,"_blank");
-      if(!w) alert("浏览器拦截了新窗口，请允许弹窗后重试。");
+      // 微信/部分浏览器会拦截新窗口，兜底直接跳转到图片
+      location.href=dataUrl;
     }
-  };
+  }
 
   try{
-    const blob = await new Promise(resolve=>canvas.toBlob(resolve,"image/png",0.92));
-    if(!blob) throw new Error("图片生成失败");
-    const blobUrl = URL.createObjectURL(blob);
-    const file = (typeof File!=='undefined') ? new File([blob], safeName, {type:"image/png"}) : null;
-    const canShareFile = !!(isMobile && navigator.share && file && (!navigator.canShare || navigator.canShare({files:[file]})));
+    // 电脑端使用 blob 下载；手机端使用 dataURL，兼容微信/iPhone长按保存。
+    const blob = await canvasToBlob(canvas);
+    const dataUrl = canvas.toDataURL("image/png");
 
-    img.src=blobUrl;
-    img.style.webkitUserSelect='auto';
-    img.style.userSelect='auto';
-    img.style.webkitTouchCallout='default';
-    down.href=blobUrl;
-    down.download=safeName;
+    img.src=dataUrl;
+    img.style.webkitUserSelect="auto";
+    img.style.userSelect="auto";
+    img.style.webkitTouchCallout="default";
+    img.setAttribute("draggable","true");
 
-    if(isMobile){
-      down.textContent = canShareFile ? "保存到手机 / 分享" : "打开图片后长按保存";
-      down.removeAttribute('download');
-      down.target = '_blank';
-      down.rel = 'noopener';
-      down.onclick = async (e)=>{
-        e.preventDefault();
-        if(canShareFile){
-          try{
-            await navigator.share({files:[file], title:safeName, text:"报价单图片"});
-            return;
-          }catch(err){
-            if(err && err.name==='AbortError') return;
-          }
-        }
-        openForSave(blobUrl);
-      };
-      shareBtn.style.display = canShareFile ? 'inline-flex' : 'none';
-      shareBtn.onclick = async ()=>{
-        if(canShareFile){
-          try{
-            await navigator.share({files:[file], title:safeName, text:"报价单图片"});
-            return;
-          }catch(err){
-            if(err && err.name==='AbortError') return;
-          }
-        }
-        openForSave(blobUrl);
-      };
-      openBtn.textContent='打开图片后长按保存';
-      if(tip) tip.textContent='手机端：优先点击“保存到手机 / 分享”；如果浏览器不支持，就点“打开图片后长按保存”，打开后长按图片保存到相册。';
-    }else{
-      down.textContent='下载图片';
-      down.download=safeName;
-      down.target='';
-      down.rel='';
-      down.onclick=null;
-      shareBtn.style.display='none';
-      if(tip) tip.textContent='电脑端：点击“下载图片”。如果没有自动下载，可点击“打开原图”后另存为。';
-    }
-
-    openBtn.onclick=()=>openForSave(blobUrl);
     modal.classList.add("show");
 
-    if(!isMobile){
+    if(isMobile){
+      if(tip) tip.textContent="手机端：先直接长按下方报价图保存到相册；如果长按没有保存选项，就点“打开大图长按保存”。";
+      down.textContent="打开大图长按保存";
+      down.removeAttribute("download");
+      down.href=dataUrl;
+      down.target="_blank";
+      down.rel="noopener";
+      down.onclick=(e)=>{e.preventDefault();openImagePage(dataUrl)};
+
+      openBtn.textContent="打开大图长按保存";
+      openBtn.onclick=()=>openImagePage(dataUrl);
+
+      // 系统分享：Safari/Chrome 支持时可直接调系统保存/分享
+      if(blob && typeof File!=="undefined" && navigator.share){
+        try{
+          const file=new File([blob],safeName,{type:"image/png"});
+          const canShare=!navigator.canShare || navigator.canShare({files:[file]});
+          if(canShare){
+            shareBtn.style.display="inline-flex";
+            shareBtn.onclick=async()=>{
+              try{ await navigator.share({files:[file],title:safeName,text:"报价单图片"}); }
+              catch(err){ if(!err || err.name!=="AbortError") openImagePage(dataUrl); }
+            };
+          }else{
+            shareBtn.style.display="none";
+          }
+        }catch(e){
+          shareBtn.style.display="none";
+        }
+      }else{
+        shareBtn.style.display="none";
+      }
+
+      // 复制图片：部分安卓 Chrome 支持
+      if(blob && navigator.clipboard && window.ClipboardItem){
+        copyBtn.style.display="inline-flex";
+        copyBtn.onclick=async()=>{
+          try{
+            await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
+            alert("已复制图片，可以去微信/聊天框粘贴。");
+          }catch(e){
+            alert("当前浏览器不支持复制图片，请使用长按保存。");
+          }
+        };
+      }else{
+        copyBtn.style.display="none";
+      }
+    }else{
+      const blobUrl = blob ? URL.createObjectURL(blob) : dataUrl;
+      if(tip) tip.textContent="电脑端：点击“下载图片”。如果没有自动下载，可点击“打开大图”。";
+      down.textContent="下载图片";
+      down.href=blobUrl;
+      down.download=safeName;
+      down.target="";
+      down.rel="";
+      down.onclick=null;
+      shareBtn.style.display="none";
+      copyBtn.style.display="none";
+      openBtn.textContent="打开大图";
+      openBtn.onclick=()=>openImagePage(dataUrl);
       setTimeout(()=>{try{down.click()}catch(e){}},80);
     }
   }catch(err){
     try{
       const dataUrl = canvas.toDataURL("image/png");
       img.src=dataUrl;
-      img.style.webkitUserSelect='auto';
-      img.style.userSelect='auto';
-      img.style.webkitTouchCallout='default';
-      down.href=dataUrl;
-      if(isMobile){
-        down.textContent='打开图片后长按保存';
-        down.removeAttribute('download');
-        down.target='_blank';
-        down.rel='noopener';
-        down.onclick=(e)=>{e.preventDefault(); openForSave(dataUrl)};
-        shareBtn.style.display='none';
-        openBtn.textContent='打开图片后长按保存';
-        if(tip) tip.textContent='手机端：点击“打开图片后长按保存”，打开后长按图片保存到相册。';
-      }else{
-        down.download=safeName;
-        down.target='';
-        down.rel='';
-        down.onclick=null;
-        shareBtn.style.display='none';
-        if(tip) tip.textContent='电脑端：点击“下载图片”。如果没有自动下载，可点击“打开原图”后另存为。';
-      }
-      openBtn.onclick=()=>openForSave(dataUrl);
       modal.classList.add("show");
+      down.textContent=isMobile?"打开大图长按保存":"下载图片";
+      down.href=dataUrl;
+      if(!isMobile) down.download=safeName;
+      down.onclick=isMobile?(e)=>{e.preventDefault();openImagePage(dataUrl)}:null;
+      openBtn.onclick=()=>openImagePage(dataUrl);
+      shareBtn.style.display="none";
+      copyBtn.style.display="none";
     }catch(e){
       alert("生成报价单图片失败："+(err.message||err));
     }

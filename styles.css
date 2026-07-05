@@ -873,3 +873,18 @@ th,td{padding:5px 5px !important; line-height:1.25 !important; vertical-align:to
 .quote-sheet.exporting .course-row{
   grid-template-columns:190px 1fr !important;
 }
+
+
+/* V11.8 仅修手机端保存图片，不改报价图模板 */
+.image-preview-scroll img {
+  -webkit-touch-callout: default !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  pointer-events: auto !important;
+}
+@media (max-width: 720px) {
+  .image-preview-scroll img {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
