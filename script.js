@@ -523,10 +523,113 @@ function buildUsdRows(c,s){
   rows.push(["注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,Math.round(c.registrationFee).toLocaleString(),""]);
   return rows;
 }
-function renderQuoteSheet(){let c=calc(),s=c.school,set=data.settings;let usdRows=buildUsdRows(c,s);let phpRows=c.localItems.map(it=>[it.name,it.perWeek?`${it.amount} PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),Math.round(it.total??it.amount).toLocaleString(),it.excluded?"不含合计":(it.note||"")]);$("quoteSheet").innerHTML=`<div class="quote-inner"><div class="sheet-head"><img class="sheet-logo" src="${set.brandLogo}"/><div class="sheet-title"><h2>${s.name} ${s.campus}</h2><h3>游学报价单（${c.weeks}周）</h3><span class="slogan">${quoteSlogan()}</span></div></div><div class="info-grid">${info("学校",s.name,s.campus)}${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜${c.endDate} 周六毕业`)}${info("课程",c.courseName||"-",c.courseDetailText||"以学校安排为准")}${info("房型",c.roomName||"-",c.roomDetailText||"住宿按所选房型")}${info("注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,"")}</div><div class="promo-grid"><div class="promo red"><h4>${s.discounts.schoolPromoTitle}</h4><p>${s.discounts.schoolPromoText}</p></div><div class="promo blue"><h4>${set.agencyAdvantageTitle}</h4><p>✓ ${set.agencyAdvantageLine1}<br/>✓ ${set.agencyAdvantageLine2}</p></div></div><div class="cost-grid"><div class="panel"><h4>费用一：学费 & 住宿费（美元）</h4>${table(["项目","说明","金额","备注"],usdRows)}<div class="panel-total">费用一合计：<strong>${Math.round(c.totalUsd).toLocaleString()} 美元</strong></div></div><div class="panel green"><h4>费用二：到校支付费用（披索）</h4>${table(["项目","说明","金额","备注"],phpRows)}<div class="panel-total">费用二合计：<strong>${Math.round(c.localPeso).toLocaleString()} PHP</strong></div></div></div><div class="summary"><h4>本次游学总计（以实际汇率为准）</h4><div class="sum-grid"><div class="sum-item"><small>美元部分</small><b>${rmb(c.tuitionRmb)}</b><span>${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}</span></div><div class="plus">+</div><div class="sum-item"><small>披索部分</small><b>${rmb(c.localRmb)}</b><span>${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}</span></div><div class="equals">≈</div><div class="sum-item final"><small>总人民币</small><b>${Math.round(c.totalRmb).toLocaleString()} 元</b><span>学费 + 本地费用</span></div></div></div><div class="foot">选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务<br/>备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含在学杂费合计内。</div></div>`}
+function renderQuoteSheet(){
+  let c=calc(),s=c.school,set=data.settings;
+  let usdRows=buildUsdRows(c,s);
+  let phpRows=c.localItems.map(it=>[
+    it.name,
+    it.perWeek?`${it.amount} PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),
+    Math.round(it.total??it.amount).toLocaleString(),
+    it.excluded?"不含合计":(it.note||"")
+  ]);
+
+  let courseRows=c.courseDetails.map(d=>`<div class="course-row"><b>${html(d.item?.name||"-")} ${d.weeks}周</b><span>${html(courseLesson(d.item)||"以学校安排为准")}</span></div>`).join("");
+  let roomRows=c.roomDetails.map(d=>`<div class="course-row"><b>${html(d.item?.name||"-")} ${d.weeks}周</b><span>住宿按所选房型</span></div>`).join("");
+
+  $("quoteSheet").innerHTML=`<div class="quote-inner">
+    <div class="sheet-head">
+      <img class="sheet-logo" src="${set.brandLogo}"/>
+      <div class="sheet-title">
+        <h2>${s.name} ${s.campus}</h2>
+        <h3>游学报价单（${c.weeks}周）</h3>
+        <span class="slogan">${quoteSlogan()}</span>
+      </div>
+    </div>
+    <div class="info-grid">
+      ${info("学校",s.name,s.campus)}
+      ${info("时间",`${c.weeks}周`,`${c.startDate} 周日入学｜${c.endDate} 周六毕业`)}
+      ${info("课程",c.courseName||"-","报名周数已列明")}
+      ${info("房型",c.roomName||"-","住宿按所选房型")}
+      ${info("注册金",`${Math.round(c.originalRegistrationFee)}美元/人`,"")}
+    </div>
+    <div class="course-extra">
+      <div>
+        <h4>具体课程课时</h4>
+        <div class="course-extra-list">${courseRows||"<p>以学校安排为准</p>"}</div>
+      </div>
+      <div>
+        <h4>住宿安排</h4>
+        <div class="course-extra-list">${roomRows||"<p>住宿按所选房型</p>"}</div>
+      </div>
+    </div>
+    <div class="promo-grid">
+      <div class="promo red"><h4>${s.discounts.schoolPromoTitle}</h4><p>${s.discounts.schoolPromoText}</p></div>
+      <div class="promo blue"><h4>${set.agencyAdvantageTitle}</h4><p>✓ ${set.agencyAdvantageLine1}<br/>✓ ${set.agencyAdvantageLine2}</p></div>
+    </div>
+    <div class="cost-grid">
+      <div class="panel"><h4>费用一：学费 & 住宿费（美元）</h4>${table(["项目","说明","金额","备注"],usdRows)}<div class="panel-total">费用一合计：<strong>${Math.round(c.totalUsd).toLocaleString()} 美元</strong></div></div>
+      <div class="panel green"><h4>费用二：到校支付费用（披索）</h4>${table(["项目","说明","金额","备注"],phpRows)}<div class="panel-total">费用二合计：<strong>${Math.round(c.localPeso).toLocaleString()} PHP</strong></div></div>
+    </div>
+    <div class="summary">
+      <h4>本次游学总计（以实际汇率为准）</h4>
+      <div class="sum-grid">
+        <div class="sum-item"><small>美元部分</small><b>${rmb(c.tuitionRmb)}</b><span>${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}</span></div>
+        <div class="plus">+</div>
+        <div class="sum-item"><small>披索部分</small><b>${rmb(c.localRmb)}</b><span>${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}</span></div>
+        <div class="equals">≈</div>
+        <div class="sum-item final"><small>总人民币</small><b>${Math.round(c.totalRmb).toLocaleString()} 元</b><span>学费 + 本地费用</span></div>
+      </div>
+    </div>
+    <div class="foot">选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务<br/>备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含在学杂费合计内。</div>
+  </div>`
+}
 function wechatText(){let c=calc(),s=c.school;return `❤️${data.settings.brandName||"超能游学"}报价\n学校：${s.name} ${s.campus}\n时间：${c.weeks}周\n课程：${c.courseName}\n课程课时：${c.courseDetailText||"以学校实际安排为准"}\n房型：${c.roomName}\n入学：${c.startDate} 周日\n毕业：${c.endDate} 周六\n${c.peakFee>0?`旺季覆盖：${c.peakWeeks}周，旺季附加：${money(c.peakFee)}\n`:""}${c.lowDiscount>0?`淡季优惠：计${c.lowDiscountWeeks}周，优惠${money(c.lowDiscount)}\n`:""}\n费用一合计：${money(c.totalUsd)}（${rmb(c.tuitionRmb)}）\n费用二本地费用：${peso(c.localPeso)}（${rmb(c.localRmb)}）\n合计人民币参考：${rmb(c.totalRmb)}\n\n备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。`}
 async function loadImage(src){return new Promise(res=>{let img=new Image();img.crossOrigin="anonymous";img.onload=()=>res(img);img.onerror=()=>res(null);img.src=src})}function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}function t(ctx,txt,x,y,mw,lh,ml=2){let cs=String(txt||"").split(""),line="",ls=[];for(let ch of cs){let test=line+ch;if(ctx.measureText(test).width>mw&&line){ls.push(line);line=ch;if(ls.length>=ml)break}else line=test}if(line&&ls.length<ml)ls.push(line);ls.forEach((l,i)=>ctx.fillText(l,x,y+i*lh))}function drawRows(ctx,heads,rows,x,y,w,rowH){let col=[w*.23,w*.37,w*.22,w*.18],cy=y,cx=x;ctx.font="bold 16px sans-serif";ctx.fillStyle="#f5f8ff";ctx.fillRect(x,cy,w,rowH);heads.forEach((h,i)=>{ctx.strokeStyle="#dbe7ff";ctx.strokeRect(cx,cy,col[i],rowH);ctx.fillStyle="#0639a6";ctx.fillText(h,cx+8,cy+25);cx+=col[i]});cy+=rowH;ctx.font="15px sans-serif";rows.forEach((r,ri)=>{cx=x;ctx.fillStyle=ri%2?"#fbfdff":"#fff";ctx.fillRect(x,cy,w,rowH);r.forEach((cell,i)=>{ctx.strokeStyle="#dbe7ff";ctx.strokeRect(cx,cy,col[i],rowH);ctx.fillStyle=i===2?"#0639a6":"#17214d";ctx.font=i===2?"bold 15px sans-serif":"15px sans-serif";t(ctx,cell,cx+7,cy+21,col[i]-12,16,2);cx+=col[i]});cy+=rowH})}
 
+
+
+function loadExternalScript(src){
+  return new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src=src;
+    s.async=true;
+    s.onload=()=>resolve(true);
+    s.onerror=()=>reject(new Error("load failed: "+src));
+    document.head.appendChild(s);
+  });
+}
+async function ensureHtml2Canvas(){
+  if(window.html2canvas) return window.html2canvas;
+  const cdns=[
+    "https://cdn.staticfile.org/html2canvas/1.4.1/html2canvas.min.js",
+    "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+    "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"
+  ];
+  let lastErr=null;
+  for(const url of cdns){
+    try{
+      await loadExternalScript(url);
+      if(window.html2canvas) return window.html2canvas;
+    }catch(err){ lastErr=err; }
+  }
+  throw lastErr || new Error("截图组件加载失败");
+}
+function waitForQuoteImages(root){
+  const imgs=[...root.querySelectorAll("img")];
+  return Promise.all(imgs.map(img=>{
+    if(img.complete && img.naturalWidth>0) return Promise.resolve(true);
+    return new Promise(resolve=>{
+      img.onload=()=>resolve(true);
+      img.onerror=()=>resolve(false);
+    });
+  }));
+}
+async function waitForExportReady(root){
+  try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch(e){}
+  await waitForQuoteImages(root);
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+}
 
 function ensureImagePreviewModal(){
   let modal=$("imagePreviewModal");
@@ -585,139 +688,50 @@ async function saveCanvasImage(canvas, filename){
 }
 
 async function downloadImage(){
-  let c=calc(),set=data.settings,s=c.school,canvas=document.createElement("canvas"),W=920,H=1640;
-  canvas.width=W*2;canvas.height=H*2;
-  let ctx=canvas.getContext("2d");
-  ctx.scale(2,2);
-  ctx.fillStyle="#fff";
-  ctx.fillRect(0,0,W,H);
+  let host=null;
+  try{
+    renderQuoteSheet();
+    const c=calc(), s=c.school;
+    const original=$("quoteSheet");
+    if(!original) throw new Error("未找到报价单区域");
 
-  function mt(txt,x,y,mw,lh,maxLines=3,color=null,font=null){
-    if(color) ctx.fillStyle=color;
-    if(font) ctx.font=font;
-    let lines=[], count=0;
-    String(txt||"").split("\n").forEach(par=>{
-      let current="";
-      for(let ch of String(par)){
-        let test=current+ch;
-        if(ctx.measureText(test).width>mw && current){
-          lines.push(current);
-          current=ch;
-          count++;
-          if(count>=maxLines) break;
-        }else{
-          current=test;
-        }
-      }
-      if(count<maxLines && current){
-        lines.push(current);
-        count++;
-      }
+    const html2canvas = await ensureHtml2Canvas();
+
+    host=document.createElement("div");
+    host.className="quote-export-host";
+    host.style.cssText="position:fixed;left:-12000px;top:0;width:1120px;background:#fff;z-index:-1;pointer-events:none;opacity:1;";
+    const clone=original.cloneNode(true);
+    clone.id="quoteSheetExport";
+    clone.classList.add("exporting");
+    host.appendChild(clone);
+    document.body.appendChild(host);
+
+    await waitForExportReady(clone);
+
+    const width=Math.ceil(clone.scrollWidth || 1080);
+    const height=Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 1600);
+
+    const canvas = await html2canvas(clone,{
+      backgroundColor:"#ffffff",
+      useCORS:true,
+      allowTaint:false,
+      scale:2,
+      width,
+      height,
+      windowWidth:1280,
+      windowHeight:Math.max(height,900),
+      scrollX:0,
+      scrollY:0
     });
-    lines.slice(0,maxLines).forEach((line,i)=>ctx.fillText(line,x,y+i*lh));
+
+    host.remove();
+    host=null;
+
+    await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`);
+  }catch(err){
+    if(host) host.remove();
+    alert("生成报价单图片失败："+(err.message||err));
   }
-
-  let logo=await loadImage(set.brandLogo||"./public/superstudy-logo.png");
-  let grad=ctx.createLinearGradient(0,0,W,160);
-  grad.addColorStop(0,"#eaf7ff");grad.addColorStop(.6,"#fff");grad.addColorStop(1,"#fff3c0");
-  ctx.fillStyle=grad;ctx.fillRect(0,0,W,160);
-  if(logo)ctx.drawImage(logo,24,18,110,110);
-
-  ctx.fillStyle="#0639a6";
-  ctx.font="bold 42px sans-serif";
-  ctx.fillText(`${s.name} ${s.campus}`,154,58);
-  ctx.font="bold 32px sans-serif";
-  ctx.fillText(`游学报价单（${c.weeks}周）`,154,104);
-  ctx.fillStyle="#0798e8";
-  rr(ctx,154,118,430,34,17);ctx.fill();
-  ctx.fillStyle="#fff";
-  ctx.font="bold 19px sans-serif";
-  ctx.fillText(quoteSlogan(),182,140);
-
-  function infoCard(x,y,w,h,title,main,sub,mainLines=3,subLines=4){
-    rr(ctx,x,y,w,h,16);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
-    ctx.fillStyle="#0639a6";ctx.font="bold 20px sans-serif";ctx.fillText(title,x+14,y+28);
-    ctx.fillStyle="#111b63";ctx.font="bold 17px sans-serif";mt(main,x+14,y+56,w-28,20,mainLines);
-    if(sub){
-      ctx.fillStyle="#667395";ctx.font="13px sans-serif";mt(sub,x+14,y+h-58,w-28,15,subLines);
-    }
-  }
-
-  const courseWeeksText = c.courseDetails.map(d=>`${d.item?.name||"-"} ${d.weeks}周`).join("\n");
-  const courseLessonText = "具体课程课时：\n" + c.courseDetails.map(d=>`${d.item?.name||"-"}：${courseLesson(d.item)||"以学校安排为准"}`).join("\n");
-  const roomWeeksText = c.roomDetails.map(d=>`${d.item?.name||"-"} ${d.weeks}周`).join("\n");
-
-  infoCard(24,176,278,100,"学校",s.name,s.campus,2,2);
-  infoCard(320,176,278,100,"时间",`${c.weeks}周`,`${c.startDate} 周日入学\n${c.endDate} 周六毕业`,2,2);
-  infoCard(616,176,280,100,"注册金",`${c.originalRegistrationFee}美元/人`,"",2,1);
-
-  infoCard(24,292,430,188,"课程",courseWeeksText,courseLessonText,4,6);
-  infoCard(466,292,430,188,"房型",roomWeeksText,"住宿按所选房型",4,2);
-
-  let promoY=496;
-  rr(ctx,24,promoY,430,118,16);ctx.fillStyle="#fff5f5";ctx.fill();ctx.strokeStyle="#ffd7d7";ctx.stroke();
-  ctx.fillStyle="#e4251a";ctx.font="bold 21px sans-serif";ctx.fillText(s.discounts.schoolPromoTitle,42,promoY+28);
-  ctx.fillStyle="#17214d";ctx.font="15px sans-serif";mt(s.discounts.schoolPromoText,42,promoY+54,392,18,4);
-
-  rr(ctx,466,promoY,430,118,16);ctx.fillStyle="#f7f9ff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
-  ctx.fillStyle="#0639a6";ctx.font="bold 21px sans-serif";ctx.fillText(set.agencyAdvantageTitle,484,promoY+28);
-  ctx.fillStyle="#17214d";ctx.font="15px sans-serif";mt(`✓ ${set.agencyAdvantageLine1}\n✓ ${set.agencyAdvantageLine2}`,484,promoY+54,392,18,4);
-
-  let boxY=632, leftX=24, rightX=466, boxW=430, boxH=600;
-  rr(ctx,leftX,boxY,boxW,boxH,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
-  ctx.fillStyle="#0639a6";rr(ctx,leftX,boxY,boxW,48,18);ctx.fill();
-  ctx.fillStyle="#fff";ctx.font="bold 20px sans-serif";ctx.fillText("费用一：学费 & 住宿费（美元）",leftX+18,boxY+31);
-  let usd=buildUsdRows(c,s);
-  drawRows(ctx,["项目","说明","金额","备注"],usd,leftX+12,boxY+58,boxW-24,42);
-  ctx.fillStyle="#fff";ctx.fillRect(leftX+12,boxY+boxH-56,boxW-24,42);
-  ctx.fillStyle="#0639a6";ctx.font="bold 22px sans-serif";ctx.fillText("费用一合计：",leftX+26,boxY+boxH-28);
-  ctx.fillStyle="#e4251a";ctx.font="bold 27px sans-serif";ctx.fillText(`${Math.round(c.totalUsd).toLocaleString()} 美元`,leftX+162,boxY+boxH-28);
-
-  rr(ctx,rightX,boxY,boxW,boxH,18);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
-  ctx.fillStyle="#0b7a48";rr(ctx,rightX,boxY,boxW,48,18);ctx.fill();
-  ctx.fillStyle="#fff";ctx.font="bold 20px sans-serif";ctx.fillText("费用二：到校支付费用（披索）",rightX+18,boxY+31);
-  let php=c.localItems.slice(0,10).map(it=>[
-    it.name.replace("（超过59天必须办理）",""),
-    it.perWeek?`${it.amount}PHP/周`:(isBooksName(it.name)?"按周数设置":"固定费用"),
-    Math.round(it.total??it.amount).toLocaleString(),
-    it.excluded?"不含合计":(it.note||"")
-  ]);
-  drawRows(ctx,["项目","说明","金额","备注"],php,rightX+12,boxY+58,boxW-24,48);
-  ctx.fillStyle="#fff";ctx.fillRect(rightX+12,boxY+boxH-56,boxW-24,42);
-  ctx.fillStyle="#0b7a48";ctx.font="bold 22px sans-serif";ctx.fillText("费用二合计：",rightX+26,boxY+boxH-28);
-  ctx.font="bold 25px sans-serif";ctx.fillText(`${Math.round(c.localPeso).toLocaleString()} PHP`,rightX+168,boxY+boxH-28);
-
-  let sumY=1248;
-  rr(ctx,24,sumY,872,206,20);ctx.fillStyle="#fbfdff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
-  ctx.fillStyle="#0639a6";ctx.textAlign="center";ctx.font="bold 28px sans-serif";
-  ctx.fillText("本次游学总计（以实际汇率为准）",W/2,sumY+40);ctx.textAlign="left";
-  let by=sumY+62;
-  [["美元部分",`${Math.round(c.totalUsd).toLocaleString()} USD × ${set.usdRate}`,rmb(c.tuitionRmb),"#0639a6"],["披索部分",`${Math.round(c.localPeso).toLocaleString()} PHP × ${set.pesoRate}`,rmb(c.localRmb),"#0b7a48"]].forEach((b,i)=>{
-    let x=48+i*318;
-    rr(ctx,x,by,242,92,16);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#dbe7ff";ctx.stroke();
-    ctx.fillStyle=b[3];ctx.font="bold 17px sans-serif";ctx.fillText(b[0],x+18,by+28);
-    ctx.fillStyle="#17214d";ctx.font="13px sans-serif";mt(b[1],x+18,by+50,206,15,2);
-    ctx.fillStyle=b[3];ctx.font="bold 18px sans-serif";ctx.fillText(b[2],x+18,by+76);
-  });
-  ctx.fillStyle="#0639a6";ctx.font="bold 34px sans-serif";ctx.fillText("+",296,by+56);ctx.fillText("≈",627,by+56);
-  ctx.fillStyle="#e4251a";ctx.font="bold 42px sans-serif";ctx.fillText(`${Math.round(c.totalRmb).toLocaleString()}`,682,by+54);
-  ctx.font="bold 18px sans-serif";ctx.fillText("人民币",724,by+82);
-
-  rr(ctx,24,1472,872,86,18);ctx.fillStyle="#fff7e8";ctx.fill();ctx.strokeStyle="#ffd98c";ctx.stroke();
-  ctx.fillStyle="#17214d";ctx.font="bold 17px sans-serif";ctx.fillText(`选择 ${set.brandName}｜价格透明｜专业顾问｜安心服务`,44,1500);
-  ctx.font="15px sans-serif";mt("备注：菲律宾本地费用只做参考，最终以学校实际收取为准。宿舍押金、接机费不含。",44,1526,820,18,2);
-
-  let wmText=set.watermarkText||set.brandName||"超能游学";
-  ctx.save();ctx.globalAlpha=.075;ctx.translate(W/2,H/2);ctx.rotate(-Math.PI/6);
-  for(let yy=-2200;yy<=2200;yy+=92){
-    for(let xx=-1800;xx<=1800;xx+=165){
-      if(logo){ctx.drawImage(logo,xx,yy-14,24,24)}
-      ctx.fillStyle="#0639a6";ctx.font="bold 17px sans-serif";ctx.fillText(wmText,xx+28,yy+4)
-    }
-  }
-  ctx.restore();
-
-  await saveCanvasImage(canvas,`${s.name}-${s.campus}-${c.weeks}周-报价单.png`)
 }
 function renderRecords(){$("recordsList").innerHTML=data.records.length?data.records.map((r,i)=>`<div class="list-item"><div><b>${r.title}</b><br/><span class="muted">${r.createdAt}</span></div><div class="list-actions"><button onclick="navigator.clipboard.writeText(data.records[${i}].text)">复制</button><button class="danger" onclick="deleteRecord(${i})">删除</button></div></div>`).join(""):`<p class="muted">暂无报价记录</p>`}function deleteRecord(i){data.records.splice(i,1);saveData();renderRecords()}
 function renderSchoolList(){$("schoolList").innerHTML=data.schools.map(s=>`<div class="list-item"><div><b>${s.name} ${s.campus}</b><br/><span class="muted">${s.courses.length}个课程 / ${s.rooms.length}个房型</span></div><div class="list-actions"><button onclick="editSchool('${s.id}')">编辑</button><button class="danger" onclick="removeSchool('${s.id}')">删除</button></div></div>`).join("")}function editSchool(id){editingSchoolId=id;renderSchoolEditor();renderFeeEditor()}function removeSchool(id){if(data.schools.length<=1)return alert("至少保留一个学校");data.schools=data.schools.filter(s=>s.id!==id);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;saveData();refreshAll()}
