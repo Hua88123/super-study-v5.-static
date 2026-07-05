@@ -650,6 +650,7 @@ function ensureImagePreviewModal(){
       <a id="imagePreviewDownload" class="button-link" download="报价单.png">下载图片</a>
       <button class="secondary" id="imagePreviewShare" style="display:none;">系统分享/保存</button>
       <button class="secondary" id="imagePreviewCopy" style="display:none;">复制图片</button>
+      <button class="secondary" id="imagePreviewServer">手机保存页</button>
       <button class="secondary" id="imagePreviewFull">全屏保存模式</button>
       <button class="secondary" id="imagePreviewOpen">打开大图长按保存</button>
     </div>
@@ -823,23 +824,54 @@ async function saveCanvasImage(canvas, filename){
   const shareBtn=$("imagePreviewShare");
   const copyBtn=$("imagePreviewCopy");
   const fullBtn=$("imagePreviewFull");
+  const serverBtn=$("imagePreviewServer");
   const tip=$("imagePreviewTip");
   const isMobile=/iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent);
 
   function canvasToBlob(c){
     return new Promise(resolve=>c.toBlob(resolve,"image/png",0.92));
   }
+
+  function postToMobileSavePage(dataUrl){
+    // 用真实 Vercel API 页面承载图片，避开手机端 blob/dataURL 下载失败。
+    // 当前页跳转，避免微信/手机浏览器拦截新窗口。
+    try{
+      const form=document.createElement("form");
+      form.method="POST";
+      form.action="/api/image-page";
+      form.target="_self";
+      form.style.display="none";
+
+      const i1=document.createElement("input");
+      i1.type="hidden";
+      i1.name="dataUrl";
+      i1.value=dataUrl;
+
+      const i2=document.createElement("input");
+      i2.type="hidden";
+      i2.name="filename";
+      i2.value=safeName;
+
+      form.appendChild(i1);
+      form.appendChild(i2);
+      document.body.appendChild(form);
+      form.submit();
+    }catch(e){
+      enterFullSavePage(dataUrl);
+    }
+  }
+
   function enterFullSavePage(dataUrl){
-    // 不开新窗口，直接在当前页面显示图片，避免微信/手机浏览器拦截。
+    // 纯前端兜底：不改图片模板，只把生成好的图片全屏展示。
     const oldHtml=document.body.innerHTML;
     const oldBg=document.body.style.background;
     document.body.style.background="#111";
     document.body.innerHTML=`<div style="min-height:100vh;background:#111;padding:0;margin:0;">
-      <div style="position:sticky;top:0;z-index:99;background:rgba(0,0,0,.82);color:#fff;padding:10px 12px;font:14px -apple-system,BlinkMacSystemFont,'PingFang SC',Arial,sans-serif;line-height:1.5;">
+      <div style="position:sticky;top:0;z-index:99;background:rgba(0,0,0,.86);color:#fff;padding:10px 12px;font:14px -apple-system,BlinkMacSystemFont,'PingFang SC',Arial,sans-serif;line-height:1.5;">
         长按下方报价图保存到相册；保存后点“返回报价系统”。
         <button id="backQuoteApp" style="float:right;border:0;border-radius:8px;background:#fff;color:#111;padding:6px 10px;font-weight:700;">返回报价系统</button>
       </div>
-      <img src="${dataUrl}" alt="${safeName}" style="display:block;width:100%;height:auto;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;" />
+      <img src="${dataUrl}" alt="${safeName}" style="display:block;width:100%;height:auto;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;touch-action:auto;" />
     </div>`;
     const back=document.getElementById("backQuoteApp");
     if(back){
@@ -850,8 +882,9 @@ async function saveCanvasImage(canvas, filename){
       };
     }
   }
+
   function openImagePage(dataUrl){
-    const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeName}</title><style>body{margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start;min-height:100vh}img{width:100%;max-width:1200px;height:auto;display:block;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;}p{position:fixed;left:0;right:0;bottom:0;margin:0;padding:10px;background:rgba(0,0,0,.72);color:#fff;font:14px sans-serif;text-align:center}</style></head><body><img src="${dataUrl}" alt="${safeName}"><p>长按图片保存到相册</p></body></html>`;
+    const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><title>${safeName}</title><style>body{margin:0;background:#111;min-height:100vh}img{width:100%;height:auto;display:block;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;touch-action:auto;}p{position:sticky;top:0;margin:0;padding:10px;background:rgba(0,0,0,.82);color:#fff;font:14px sans-serif;text-align:center;z-index:2}</style></head><body><p>长按图片保存到相册</p><img src="${dataUrl}" alt="${safeName}"></body></html>`;
     const w=window.open("about:blank","_blank");
     if(w){
       w.document.open();
@@ -874,17 +907,23 @@ async function saveCanvasImage(canvas, filename){
 
     modal.classList.add("show");
 
-    fullBtn.style.display="inline-flex";
-    fullBtn.onclick=()=>enterFullSavePage(dataUrl);
+    if(serverBtn){
+      serverBtn.style.display="inline-flex";
+      serverBtn.onclick=()=>postToMobileSavePage(dataUrl);
+    }
+    if(fullBtn){
+      fullBtn.style.display="inline-flex";
+      fullBtn.onclick=()=>enterFullSavePage(dataUrl);
+    }
 
     if(isMobile){
-      if(tip) tip.textContent="手机端：先点“全屏保存模式”，再长按报价图保存；如果不行，再试“系统分享/保存”。";
-      down.textContent="全屏保存模式";
+      if(tip) tip.textContent="手机端：请点“手机保存页”，进入后长按图片保存。这个方式比直接下载更稳定。";
+      down.textContent="手机保存页";
       down.removeAttribute("download");
       down.href="#";
       down.target="";
       down.rel="";
-      down.onclick=(e)=>{e.preventDefault();enterFullSavePage(dataUrl)};
+      down.onclick=(e)=>{e.preventDefault();postToMobileSavePage(dataUrl)};
 
       openBtn.textContent="打开大图长按保存";
       openBtn.onclick=()=>openImagePage(dataUrl);
@@ -897,7 +936,7 @@ async function saveCanvasImage(canvas, filename){
             shareBtn.style.display="inline-flex";
             shareBtn.onclick=async()=>{
               try{ await navigator.share({files:[file],title:safeName,text:"报价单图片"}); }
-              catch(err){ if(!err || err.name!=="AbortError") enterFullSavePage(dataUrl); }
+              catch(err){ if(!err || err.name!=="AbortError") postToMobileSavePage(dataUrl); }
             };
           }else{
             shareBtn.style.display="none";
@@ -916,7 +955,7 @@ async function saveCanvasImage(canvas, filename){
             await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);
             alert("已复制图片，可以去微信/聊天框粘贴。");
           }catch(e){
-            alert("当前浏览器不支持复制图片，请使用全屏保存模式。");
+            alert("当前浏览器不支持复制图片，请使用“手机保存页”。");
           }
         };
       }else{
@@ -933,6 +972,8 @@ async function saveCanvasImage(canvas, filename){
       down.onclick=null;
       shareBtn.style.display="none";
       copyBtn.style.display="none";
+      if(serverBtn) serverBtn.style.display="none";
+      if(fullBtn) fullBtn.style.display="none";
       openBtn.textContent="打开大图";
       openBtn.onclick=()=>openImagePage(dataUrl);
       setTimeout(()=>{try{down.click()}catch(e){}},80);
@@ -942,11 +983,17 @@ async function saveCanvasImage(canvas, filename){
       const dataUrl = canvas.toDataURL("image/png");
       img.src=dataUrl;
       modal.classList.add("show");
-      fullBtn.style.display="inline-flex";
-      fullBtn.onclick=()=>enterFullSavePage(dataUrl);
-      down.textContent=isMobile?"全屏保存模式":"下载图片";
+      if(serverBtn){
+        serverBtn.style.display="inline-flex";
+        serverBtn.onclick=()=>postToMobileSavePage(dataUrl);
+      }
+      if(fullBtn){
+        fullBtn.style.display="inline-flex";
+        fullBtn.onclick=()=>enterFullSavePage(dataUrl);
+      }
+      down.textContent=isMobile?"手机保存页":"下载图片";
       down.href="#";
-      down.onclick=(e)=>{e.preventDefault();enterFullSavePage(dataUrl)};
+      down.onclick=(e)=>{e.preventDefault();postToMobileSavePage(dataUrl)};
       openBtn.onclick=()=>openImagePage(dataUrl);
       shareBtn.style.display="none";
       copyBtn.style.display="none";
