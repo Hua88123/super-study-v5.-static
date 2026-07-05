@@ -645,9 +645,10 @@ function ensureImagePreviewModal(){
       <b>报价单图片已生成</b>
       <button class="secondary" id="imagePreviewClose">关闭</button>
     </div>
-    <p class="muted">手机端：长按下方图片保存到相册。电脑端：点击“下载图片”。</p>
+    <p class="muted" id="imagePreviewTip">手机端：点击“保存到手机”；如果浏览器不支持，就点“打开图片后长按保存”。电脑端：点击“下载图片”。</p>
     <div class="image-preview-actions">
       <a id="imagePreviewDownload" class="button-link" download="报价单.png">下载图片</a>
+      <button class="secondary" id="imagePreviewShare" style="display:none;">保存到手机</button>
       <button class="secondary" id="imagePreviewOpen">打开原图</button>
     </div>
     <div class="image-preview-scroll"><img id="imagePreviewImg" alt="报价单图片"/></div>
@@ -737,23 +738,78 @@ async function saveCanvasImage(canvas, filename){
   const img=$("imagePreviewImg");
   const down=$("imagePreviewDownload");
   const openBtn=$("imagePreviewOpen");
+  const shareBtn=$("imagePreviewShare");
+  const tip=$("imagePreviewTip");
+  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  const openForSave=(url)=>{
+    if(isMobile){
+      const w=window.open(url,"_blank");
+      if(!w) location.href=url;
+    }else{
+      const w=window.open(url,"_blank");
+      if(!w) alert("浏览器拦截了新窗口，请允许弹窗后重试。");
+    }
+  };
+
   try{
     const blob = await new Promise(resolve=>canvas.toBlob(resolve,"image/png",0.92));
     if(!blob) throw new Error("图片生成失败");
     const blobUrl = URL.createObjectURL(blob);
+    const file = (typeof File!=='undefined') ? new File([blob], safeName, {type:"image/png"}) : null;
+    const canShareFile = !!(isMobile && navigator.share && file && (!navigator.canShare || navigator.canShare({files:[file]})));
 
     img.src=blobUrl;
+    img.style.webkitUserSelect='auto';
+    img.style.userSelect='auto';
+    img.style.webkitTouchCallout='default';
     down.href=blobUrl;
     down.download=safeName;
-    openBtn.onclick=()=>{
-      const w=window.open(blobUrl,"_blank");
-      if(!w){
-        alert("浏览器拦截了新窗口，请直接长按预览图片保存。");
-      }
-    };
+
+    if(isMobile){
+      down.textContent = canShareFile ? "保存到手机 / 分享" : "打开图片后长按保存";
+      down.removeAttribute('download');
+      down.target = '_blank';
+      down.rel = 'noopener';
+      down.onclick = async (e)=>{
+        e.preventDefault();
+        if(canShareFile){
+          try{
+            await navigator.share({files:[file], title:safeName, text:"报价单图片"});
+            return;
+          }catch(err){
+            if(err && err.name==='AbortError') return;
+          }
+        }
+        openForSave(blobUrl);
+      };
+      shareBtn.style.display = canShareFile ? 'inline-flex' : 'none';
+      shareBtn.onclick = async ()=>{
+        if(canShareFile){
+          try{
+            await navigator.share({files:[file], title:safeName, text:"报价单图片"});
+            return;
+          }catch(err){
+            if(err && err.name==='AbortError') return;
+          }
+        }
+        openForSave(blobUrl);
+      };
+      openBtn.textContent='打开图片后长按保存';
+      if(tip) tip.textContent='手机端：优先点击“保存到手机 / 分享”；如果浏览器不支持，就点“打开图片后长按保存”，打开后长按图片保存到相册。';
+    }else{
+      down.textContent='下载图片';
+      down.download=safeName;
+      down.target='';
+      down.rel='';
+      down.onclick=null;
+      shareBtn.style.display='none';
+      if(tip) tip.textContent='电脑端：点击“下载图片”。如果没有自动下载，可点击“打开原图”后另存为。';
+    }
+
+    openBtn.onclick=()=>openForSave(blobUrl);
     modal.classList.add("show");
 
-    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if(!isMobile){
       setTimeout(()=>{try{down.click()}catch(e){}},80);
     }
@@ -761,17 +817,28 @@ async function saveCanvasImage(canvas, filename){
     try{
       const dataUrl = canvas.toDataURL("image/png");
       img.src=dataUrl;
+      img.style.webkitUserSelect='auto';
+      img.style.userSelect='auto';
+      img.style.webkitTouchCallout='default';
       down.href=dataUrl;
-      down.download=safeName;
-      openBtn.onclick=()=>{
-        const w=window.open();
-        if(w){
-          w.document.write(`<title>${safeName}</title><img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`);
-          w.document.close();
-        }else{
-          alert("浏览器拦截了新窗口，请直接长按预览图片保存。");
-        }
-      };
+      if(isMobile){
+        down.textContent='打开图片后长按保存';
+        down.removeAttribute('download');
+        down.target='_blank';
+        down.rel='noopener';
+        down.onclick=(e)=>{e.preventDefault(); openForSave(dataUrl)};
+        shareBtn.style.display='none';
+        openBtn.textContent='打开图片后长按保存';
+        if(tip) tip.textContent='手机端：点击“打开图片后长按保存”，打开后长按图片保存到相册。';
+      }else{
+        down.download=safeName;
+        down.target='';
+        down.rel='';
+        down.onclick=null;
+        shareBtn.style.display='none';
+        if(tip) tip.textContent='电脑端：点击“下载图片”。如果没有自动下载，可点击“打开原图”后另存为。';
+      }
+      openBtn.onclick=()=>openForSave(dataUrl);
       modal.classList.add("show");
     }catch(e){
       alert("生成报价单图片失败："+(err.message||err));
