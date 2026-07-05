@@ -849,10 +849,10 @@ async function drawNativeQuoteCanvas(){
   const temp=document.createElement("canvas").getContext("2d");
   temp.font="14px Arial, sans-serif";
   const usdCols=[455*.22,455*.40,455*.20,455*.18];
-  const phpCols=[455*.36,455*.24,455*.20,455*.20];
+  const phpCols=[455*.40,455*.21,455*.17,455*.22];
   let usdH=36+usdRows.reduce((a,r)=>a+rowHeightByText(temp,r,usdCols),0)+70;
   let phpH=36+phpRows.reduce((a,r)=>a+rowHeightByText(temp,r,phpCols,{singleLineCols:[0],smallCols:[0]}),0)+70;
-  let panelH=Math.max(420,usdH,phpH);
+  let panelH=Math.max(470,usdH+10,phpH+20);
 
   const promoTextLines=Math.max(
     wrapCanvasText(temp,s.discounts.schoolPromoText,420,10).length,
@@ -866,9 +866,8 @@ async function drawNativeQuoteCanvas(){
   const roomBoxH=Math.max(120,54+roomLines*24);
   const extraH=Math.max(courseBoxH,roomBoxH);
 
-  const H=190+120+extraH+promoH+panelH+210+110+60;
-  const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const scale=isMobile?1.2:1.8;
+  const H=220+130+extraH+promoH+panelH+260+120+80;
+  const scale=1.8;
   const canvas=document.createElement("canvas");
   canvas.width=Math.round(W*scale);
   canvas.height=Math.round(H*scale);
@@ -942,17 +941,31 @@ async function drawNativeQuoteCanvas(){
 
   const panelW=(W-margin*2-14)/2;
   function drawPanel(x,y,title,green,rows,totalText,totalAmount,opt={}){
-    ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y,panelW,panelH,20,true,true);
-    ctx.fillStyle=green?"#0b7a48":"#0639a6";canvasRoundRect(ctx,x,y,panelW,50,20,true,false);
+    const headerH=50;
+    const tableStartY=y+62;
+    const contentPad=12;
+    // 先按真实表格内容测算面板高度，避免最后几行被底部合计区域覆盖
+    let tableEstimate=36;
+    const col=opt.colWidths || [(panelW-24)*.22,(panelW-24)*.40,(panelW-24)*.20,(panelW-24)*.18];
+    rows.forEach(r=>tableEstimate+=rowHeightByText(ctx,r,col,opt));
+    const dynamicH=Math.max(panelH, 62 + tableEstimate + 68);
+
+    ctx.fillStyle="#fff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,x,y,panelW,dynamicH,20,true,true);
+    ctx.fillStyle=green?"#0b7a48":"#0639a6";canvasRoundRect(ctx,x,y,panelW,headerH,20,true,false);
     ctx.fillStyle="#fff";ctx.font="bold 19px Arial, sans-serif";ctx.fillText(title,x+16,y+31);
-    let endY=drawNativeTable(ctx,["项目","说明","金额","备注"],rows,x+12,y+62,panelW-24,opt);
-    ctx.fillStyle="#fff";ctx.fillRect(x+12,y+panelH-62,panelW-24,46);
-    ctx.fillStyle=green?"#0b7a48":"#0639a6";ctx.font="bold 22px Arial, sans-serif";ctx.fillText(totalText,x+24,y+panelH-31);
-    ctx.fillStyle=green?"#0b7a48":"#e4251a";ctx.font="bold 26px Arial, sans-serif";ctx.fillText(totalAmount,x+164,y+panelH-31);
+
+    let endY=drawNativeTable(ctx,["项目","说明","金额","备注"],rows,x+12,tableStartY,panelW-24,opt);
+
+    // 底部合计区域紧跟表格内容，保证表格完整显示
+    const totalY=endY+10;
+    ctx.fillStyle="#fff";ctx.fillRect(x+12,totalY,panelW-24,42);
+    ctx.fillStyle=green?"#0b7a48":"#0639a6";ctx.font="bold 22px Arial, sans-serif";ctx.fillText(totalText,x+24,totalY+28);
+    ctx.fillStyle=green?"#0b7a48":"#e4251a";ctx.font="bold 26px Arial, sans-serif";ctx.fillText(totalAmount,x+164,totalY+28);
+    return dynamicH;
   }
-  drawPanel(margin,y,"费用一：学费 & 住宿费（美元）",false,usdRows,"费用一合计：",`${Math.round(c.totalUsd).toLocaleString()} 美元`,{colWidths:usdCols});
-  drawPanel(margin+panelW+14,y,"费用二：到校支付费用（披索）",true,phpRows,"费用二合计：",`${Math.round(c.localPeso).toLocaleString()} PHP`,{colWidths:phpCols,singleLineCols:[0],smallCols:[0]});
-  y+=panelH+16;
+  const leftPanelH=drawPanel(margin,y,"费用一：学费 & 住宿费（美元）",false,usdRows,"费用一合计：",`${Math.round(c.totalUsd).toLocaleString()} 美元`,{colWidths:usdCols});
+  const rightPanelH=drawPanel(margin+panelW+14,y,"费用二：到校支付费用（披索）",true,phpRows,"费用二合计：",`${Math.round(c.localPeso).toLocaleString()} PHP`,{colWidths:phpCols,singleLineCols:[0],smallCols:[0]});
+  y+=Math.max(leftPanelH,rightPanelH)+16;
 
   ctx.fillStyle="#fbfdff";ctx.strokeStyle="#dbe7ff";canvasRoundRect(ctx,margin,y,W-margin*2,200,22,true,true);
   ctx.fillStyle="#0639a6";ctx.font="bold 28px Arial, sans-serif";ctx.textAlign="center";ctx.fillText("本次游学总计（以实际汇率为准）",W/2,y+42);ctx.textAlign="left";
