@@ -634,7 +634,7 @@ function info(t,b,s){return `<div class="info"><small>${t}</small><b>${b}</b><sp
 function buildUsdRows(c,s){
   let rows=[];
   c.courseDetails.forEach((d,i)=>{
-    rows.push([c.courseDetails.length>1?`课程${i+1}`:"课程",`${d.item?.name||"-"} / ${num(d.item?.price4w)}美元/4周`,Math.round(d.amount).toLocaleString(),courseLesson(d.item)||`${d.weeks}周`]);
+    rows.push([c.courseDetails.length>1?`课程${i+1}`:"课程",`${d.item?.name||"-"} / ${num(d.item?.price4w)}美元/4周`,Math.round(d.amount).toLocaleString(),`${d.weeks}周`]);
   });
   c.roomDetails.forEach((d,i)=>{
     rows.push([c.roomDetails.length>1?`房型${i+1}`:"房型",`${d.item?.name||"-"} / ${num(d.item?.price4w)}美元/4周`,Math.round(d.amount).toLocaleString(),`${d.weeks}周`]);
