@@ -578,9 +578,13 @@ function calc(){
 
   let beforeAgency=beforeSchool-schoolRate;
 
-  let agencyPeakPart=(autoSeason.inPeak && $("agencyDiscount").checked)?peak:0;
-  let agencyEligibleBase=Math.max(0,base*(agencyWeeks/weeks)-low-longD-schoolRate+agencyPeakPart);
-  let agency=(agencyWeeks>0 || agencyPeakPart>0) ? agencyEligibleBase*(1-num(d.agencyDiscountRate)) : 0;
+  // 超能折扣按本次全部学费、住宿费及旺季附加计算，
+  // 不再按旺季覆盖周数比例拆分，避免8周课程只优惠1周。
+  let agencyEnabled=$("agencyDiscount").checked && d.agencyDiscountEnabled!==false;
+  let agencyPeakPart=agencyEnabled?peak:0;
+  let agencyEligibleBase=agencyEnabled?Math.max(0,beforeAgency):0;
+  let agency=agencyEnabled ? agencyEligibleBase*(1-num(d.agencyDiscountRate)) : 0;
+  agencyWeeks=agencyEnabled?weeks:0;
 
   let afterAgency=beforeAgency-agency,
       regWaive=waiveWeeks>0?Math.min(num(d.registrationFee),num(d.registrationWaiverAmount)):0,
