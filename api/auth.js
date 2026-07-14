@@ -13,6 +13,38 @@ const DATA_ROW = process.env.SUPABASE_ROW || "main";
 const EMP_TABLE = process.env.SUPABASE_EMPLOYEE_TABLE || "super_study_employees";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SuperStudy888";
 
+const EMP_COOKIE = "ss_employee_id_v11";
+const DEVICE_COOKIE = "ss_device_id_v11";
+const REMEMBER_SECONDS = 60 * 60 * 24 * 365;
+
+function parseCookies(req){
+  const raw = String(req.headers.cookie || "");
+  const out = {};
+  raw.split(";").forEach(part=>{
+    const i=part.indexOf("=");
+    if(i<0) return;
+    const k=part.slice(0,i).trim();
+    const v=part.slice(i+1).trim();
+    try{out[k]=decodeURIComponent(v)}catch(e){out[k]=v}
+  });
+  return out;
+}
+function setRememberCookies(res, employeeId, deviceId){
+  const base = `Path=/; Max-Age=${REMEMBER_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+  res.setHeader("Set-Cookie",[
+    `${EMP_COOKIE}=${encodeURIComponent(employeeId)}; ${base}`,
+    `${DEVICE_COOKIE}=${encodeURIComponent(deviceId)}; ${base}`
+  ]);
+}
+function clearRememberCookies(res){
+  const base = "Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax";
+  res.setHeader("Set-Cookie",[
+    `${EMP_COOKIE}=; ${base}`,
+    `${DEVICE_COOKIE}=; ${base}`
+  ]);
+}
+
+
 function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -110,15 +142,40 @@ module.exports = async function handler(req,res){
       }else{
         await sbRequest("PATCH",`/rest/v1/${encodeURIComponent(EMP_TABLE)}?id=eq.${encodeURIComponent(emp.id)}`,{last_login_at:new Date().toISOString()}).catch(()=>{});
       }
-      return json(res,200,{employee:{id:emp.id,name:emp.name}});
+      setRememberCookies(res, emp.id, deviceId);
+      return json(res,200,{employee:{id:emp.id,name:emp.name},deviceId});
+    }
+
+
+    if(action==="restore"){
+      const cookies=parseCookies(req);
+      const employeeId=String(cookies[EMP_COOKIE]||"").trim();
+      const deviceId=String(cookies[DEVICE_COOKIE]||"").trim();
+      if(!employeeId||!deviceId) return json(res,200,{valid:false});
+      const emp=await getEmployee(employeeId);
+      const valid=!!(emp&&emp.is_active&&emp.bound_device_id===deviceId);
+      if(!valid){
+        clearRememberCookies(res);
+        return json(res,200,{valid:false});
+      }
+      setRememberCookies(res, emp.id, deviceId);
+      return json(res,200,{valid:true,employee:{id:emp.id,name:emp.name},deviceId});
+    }
+
+    if(action==="logout"){
+      clearRememberCookies(res);
+      return json(res,200,{ok:true});
     }
 
     if(action==="check"){
-      const employeeId=String(body.employeeId||"").trim();
-      const deviceId=String(body.deviceId||"").trim();
+      const cookies=parseCookies(req);
+      const employeeId=String(body.employeeId||cookies[EMP_COOKIE]||"").trim();
+      const deviceId=String(body.deviceId||cookies[DEVICE_COOKIE]||"").trim();
       const emp=employeeId?await getEmployee(employeeId):null;
       const valid=!!(emp&&emp.is_active&&emp.bound_device_id===deviceId);
-      return json(res,200,{valid,employee:valid?{id:emp.id,name:emp.name}:null});
+      if(valid) setRememberCookies(res, emp.id, deviceId);
+      else if(cookies[EMP_COOKIE]||cookies[DEVICE_COOKIE]) clearRememberCookies(res);
+      return json(res,200,{valid,employee:valid?{id:emp.id,name:emp.name}:null,deviceId:valid?deviceId:null});
     }
 
     return json(res,400,{error:"未知操作"});

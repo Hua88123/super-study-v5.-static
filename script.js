@@ -1300,15 +1300,36 @@ function adminLogout(){
   alert("已退出管理员模式");
 }
 
+
+async function restoreRememberedEmployee(){
+  if(isAgentMode() || isAdminMode()) return false;
+  try{
+    const res=await fetch("/api/auth",{
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"restore"})
+    });
+    const body=await res.json().catch(()=>({}));
+    if(res.ok && body.valid && body.employee){
+      localStorage.setItem(EMPLOYEE_SESSION_KEY,JSON.stringify(body.employee));
+      if(body.deviceId) localStorage.setItem(DEVICE_ID_KEY,body.deviceId);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
 async function employeeLogin(){
   const input=$("employeeCodeInput");
   const code=(input?.value||"").trim();
   if(!code) return alert("请输入员工授权码");
   try{
-    const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"login",code,deviceId:getDeviceId(),deviceName:navigator.userAgent.slice(0,120)})});
+    const res=await fetch("/api/auth",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"login",code,deviceId:getDeviceId(),deviceName:navigator.userAgent.slice(0,120)})});
     const body=await res.json().catch(()=>({}));
     if(!res.ok||body.error) throw new Error(body.error||"登录失败");
     localStorage.setItem(EMPLOYEE_SESSION_KEY,JSON.stringify(body.employee));
+    if(body.deviceId) localStorage.setItem(DEVICE_ID_KEY,body.deviceId);
     sessionStorage.removeItem(ADMIN_SESSION_KEY);
     sessionStorage.removeItem(ADMIN_PASS_KEY);
     applyRoleMode();
@@ -1319,7 +1340,10 @@ async function employeeLogin(){
   }
 }
 
-function employeeLogout(){
+async function employeeLogout(){
+  try{
+    await fetch("/api/auth",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"})});
+  }catch(e){}
   localStorage.removeItem(EMPLOYEE_SESSION_KEY);clearAgentSession();
   applyRoleMode();
   alert("已退出员工登录");
@@ -1329,13 +1353,20 @@ async function verifyEmployeeSession(){
   const emp=getEmployeeSession();
   if(!emp || isAdminMode()) return;
   try{
-    const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"check",employeeId:emp.id,deviceId:getDeviceId()})});
+    const res=await fetch("/api/auth",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"check",employeeId:emp.id,deviceId:getDeviceId()})});
     const body=await res.json().catch(()=>({}));
-    if(!res.ok||body.error||!body.valid){
+    if(res.ok && body.valid){
+      if(body.employee) localStorage.setItem(EMPLOYEE_SESSION_KEY,JSON.stringify(body.employee));
+      if(body.deviceId) localStorage.setItem(DEVICE_ID_KEY,body.deviceId);
+      return;
+    }
+    if(res.ok && !body.valid){
       localStorage.removeItem(EMPLOYEE_SESSION_KEY);clearAgentSession();
       applyRoleMode();
     }
-  }catch(e){}
+  }catch(e){
+    // 网络短暂断开、手机切后台时不清除登录状态。
+  }
 }
 
 
@@ -1562,7 +1593,7 @@ async function deleteAgent(id){
 }
 
 
-function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();renderBackupManager();loadEmployees();loadAgents();updateBrandChrome()}function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(["courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2"].includes(id)){lastChangedMultiWeek=id}if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){lastChangedMultiWeek="";updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();verifyEmployeeSession();verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
+function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelectors();renderCalc();renderRecords();renderSchoolList();renderSchoolEditor();renderFeeEditor();renderSettings();renderBackupManager();loadEmployees();loadAgents();updateBrandChrome()}async function init(){applyCloudConfigFromUrl();setupLoginOverlayText();document.querySelectorAll(".nav").forEach(btn=>btn.addEventListener("click",()=>activateTab(btn.dataset.tab)));["schoolSelect","courseSelect","courseSelect2","roomSelect","roomSelect2","weeksSelect","startDateSelect","multiMode","courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2","lowSeason","schoolRate","peakSeason","longDiscount","agencyDiscount","waiveRegistration"].forEach(id=>$(id)?.addEventListener("change",()=>{if(["courseWeeks1","courseWeeks2","roomWeeks1","roomWeeks2"].includes(id)){lastChangedMultiWeek=id}if(id==="schoolSelect"){selectedSchoolId=$("schoolSelect").value;renderSelectors()}if(id==="multiMode"||id==="weeksSelect"){lastChangedMultiWeek="";updateMultiModeUI()}renderCalc()}));$("adminLoginBtn").onclick=adminLogin;$("adminLogoutBtn").onclick=adminLogout;if($("employeeAdminLoginBtn"))$("employeeAdminLoginBtn").onclick=adminLogin;if($("employeeLoginBtn"))$("employeeLoginBtn").onclick=()=>isAgentMode()?agentLogin():employeeLogin();if($("employeeLogoutBtn"))$("employeeLogoutBtn").onclick=()=>isAgentMode()?agentLogout():employeeLogout();if(!isAgentMode()&&!isAdminMode())await restoreRememberedEmployee();await verifyEmployeeSession();await verifyAgentSession();if(isAgentMode())document.body.classList.add("agent-mode");applyRoleMode();$("copyWechat").onclick=async()=>{await navigator.clipboard.writeText(wechatText());alert("已复制微信报价")};$("saveRecord").onclick=()=>{if(!isAdminMode()) return alert("员工模式不能保存记录");let c=calc();data.records.unshift({title:`${c.school.name} ${c.school.campus} ${c.weeks}周 ${Math.round(c.totalRmb).toLocaleString()}元`,text:wechatText(),createdAt:new Date().toLocaleString()});saveData();renderRecords();alert("已保存")};$("downloadImage").onclick=async()=>{
   const btn=$("downloadImage");
   const old=btn.textContent;
   try{
@@ -1575,4 +1606,15 @@ function refreshAll(){if(isAgentMode())applyAgentBrandingToData();renderSelector
     btn.disabled=false;
     btn.textContent=old;
   }
-};$("printPdf").onclick=()=>window.print();$("addSchool").onclick=async()=>{try{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveLocalOnly();refreshAll();activateTab("schools");scheduleCloudSave();setTimeout(()=>{const el=$("schoolName");if(el){el.focus();el.select&&el.select()}},50)}catch(err){alert("新增学校失败："+(err.message||err))}};$("backupBtn").onclick=()=>exportCurrentData();$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{backupSnapshot("导入数据前");data=normalize(JSON.parse(r.result));backupSnapshot("导入数据后");saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){backupSnapshot("恢复默认前");localStorage.removeItem(currentStorageKey());data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();autoLoadCloudData()}init();
+};$("printPdf").onclick=()=>window.print();$("addSchool").onclick=async()=>{try{let id="school"+Date.now();data.schools.push({id,name:"新学校",campus:"校区",courses:[{id:"course"+Date.now(),name:"ESL",price4w:0,note:"",lessonText:""}],rooms:[{id:"room"+Date.now(),name:"单人间",price4w:0}],discounts:{...defaultData.schools[0].discounts},localFees:feeTemplate.map(([name,amount,perWeek])=>({name,amount,perWeek})),officialTotals:{},bookFees:{4:2500,8:4000,12:5500},visaFees:{9:7500,12:10000,16:13000,20:16000}});selectedSchoolId=id;editingSchoolId=id;saveLocalOnly();refreshAll();activateTab("schools");scheduleCloudSave();setTimeout(()=>{const el=$("schoolName");if(el){el.focus();el.select&&el.select()}},50)}catch(err){alert("新增学校失败："+(err.message||err))}};$("backupBtn").onclick=()=>exportCurrentData();$("importData").onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{backupSnapshot("导入数据前");data=normalize(JSON.parse(r.result));backupSnapshot("导入数据后");saveData();selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll();alert("导入成功")}catch(err){alert("导入失败")}};r.readAsText(file)};$("resetBtn").onclick=()=>{if(confirm("确定恢复默认？本浏览器保存的数据会清空。")){backupSnapshot("恢复默认前");localStorage.removeItem(currentStorageKey());data=clone(defaultData);selectedSchoolId=data.schools[0].id;editingSchoolId=selectedSchoolId;refreshAll()}};refreshAll();applyRoleMode();await autoLoadCloudData();
+  window.addEventListener("pageshow",async()=>{
+    if(!isAgentMode()&&!isAdminMode()) await restoreRememberedEmployee();
+    applyRoleMode();
+  });
+  document.addEventListener("visibilitychange",async()=>{
+    if(document.visibilityState==="visible"){
+      if(!isAgentMode()&&!isAdminMode()) await restoreRememberedEmployee();
+      applyRoleMode();
+    }
+  });
+}init();
